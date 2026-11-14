@@ -20,13 +20,16 @@ const TZ_NAME = env.TZ_NAME || 'America/Sao_Paulo'; // servidores da Vercel roda
 const ADMIN_USER = env.ADMIN_USER || 'admin';
 const STUDIO = env.STUDIO_NAME || 'Studio Manicure & Pedicure';
 
-// Em produção, credenciais fracas/padrão não são aceitas
+// Em produção, credenciais fracas/padrão não são aceitas. Em vez de derrubar a função (erro genérico da Vercel),
+// o sistema sobe e responde 503 explicando quais variáveis faltam (veja /api/health).
+const configErros = [];
 if (PROD) {
   const erros = [];
   const exemplos = ['admin123', 'troque-esta-senha', 'troque-este-segredo', 'dev-secret-troque']; // valores públicos (código/.env.example)
   if (!env.ADMIN_PASS || env.ADMIN_PASS.length < 8 || exemplos.includes(env.ADMIN_PASS)) erros.push('ADMIN_PASS (mínimo 8 caracteres e diferente dos exemplos)');
   if (!env.SESSION_SECRET || env.SESSION_SECRET.length < 16 || exemplos.includes(env.SESSION_SECRET)) erros.push('SESSION_SECRET (mínimo 16 caracteres e diferente dos exemplos)');
-  if (erros.length) throw new Error('Configuração insegura para produção. Defina: ' + erros.join(' e '));
+  configErros.push(...erros);
+  if (erros.length) console.error('✖ Configuração insegura para produção. Defina: ' + erros.join(' e '));
 }
 const ADMIN_HASH = bcrypt.hashSync(env.ADMIN_PASS || 'admin123', 10);
 if (!PROD && !env.ADMIN_PASS) console.warn('⚠ Usando senha de admin padrão. Defina ADMIN_PASS no .env.');
@@ -140,6 +143,13 @@ app.use('/api', (req, res, next) => {
   } catch {}
   res.status(403).json({ erro: 'Origem não permitida.' });
 });
+// Configuração insegura/incompleta em produção: nada funciona, mas /api/health diz exatamente o que definir
+app.use('/api', (req, res, next) => {
+  if (!configErros.length) return next();
+  if (req.path === '/health') return res.status(503).json({ ok: false, etapa: 'configuracao', variaveis: configErros, dica: 'Defina essas variáveis em Vercel → Settings → Environment Variables (valores fortes, diferentes dos exemplos) e faça Redeploy.' });
+  res.status(503).json({ erro: 'Sistema em configuração. Tente novamente em instantes.' });
+});
+
 // Diagnóstico: testa a conexão com o banco e explica a causa provável (sem expor senha/host). Abra /api/health
 const dicaBanco = (e) => {
   const m = String(e.message || ''), c = String(e.code || '');

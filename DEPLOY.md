@@ -65,6 +65,8 @@ Abra `https://SEU-DOMINIO/api/health`. Se o banco não conecta, ele responde `50
 
 | Código / mensagem | Causa provável |
 |---|---|
+| `"etapa":"configuracao"` | faltam `ADMIN_PASS` e/ou `SESSION_SECRET` (ou estão iguais aos exemplos). A lista de variáveis vem em `variaveis` |
+| `FUNCTION_INVOCATION_FAILED` (texto, não JSON) | falha ao carregar a função (versões antigas faziam isso quando faltava `ADMIN_PASS`/`SESSION_SECRET`). Atualize o deploy |
 | `SEM_DATABASE_URL` | variável `DATABASE_URL` não definida na Vercel (depois de definir, faça **Redeploy**) |
 | `Tenant or user not found` | usuário errado: use o formato `postgres.SEU_REF` do *Transaction pooler* |
 | `28P01` | senha incorreta (caracteres especiais precisam ser codificados: `@` → `%40`) |

@@ -248,13 +248,15 @@ test('endpoint de saúde informa a data no fuso do Brasil', async () => {
   const esperado = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   assert.equal(r.json.hoje, esperado);
 });
-test('servidor em modo produção recusa credenciais padrão', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-qa-prod-'));
-  const p = await startServer({ NODE_ENV: 'production', ADMIN_PASS: '', SESSION_SECRET: '' }, dir, PORT + 500);
-  await sleep(500);
-  const morreu = p.exitCode !== null && p.exitCode !== 0;
-  p.kill(); fs.rmSync(dir, { recursive: true, force: true });
-  assert.ok(morreu, 'deveria encerrar com erro ao faltar ADMIN_PASS/SESSION_SECRET. Log: ' + p.log.slice(0, 200));
+test('produção com credenciais ausentes/padrão: sobe, mas bloqueia tudo e /api/health lista as variáveis', async () => {
+  const faltando = await healthDe({ NODE_ENV: 'production', ADMIN_PASS: '', SESSION_SECRET: '' }, PORT + 500);
+  assert.equal(faltando.status, 503); assert.equal(faltando.json.etapa, 'configuracao');
+  assert.ok(faltando.json.variaveis.some((v) => v.startsWith('ADMIN_PASS')) && faltando.json.variaveis.some((v) => v.startsWith('SESSION_SECRET')));
+  assert.equal(faltando.config, 503, 'nenhuma rota funciona com configuração insegura');
+  const exemplo = await healthDe({ NODE_ENV: 'production', ADMIN_PASS: 'admin123', SESSION_SECRET: 'troque-este-segredo' }, PORT + 505);
+  assert.equal(exemplo.status, 503); assert.equal(exemplo.json.variaveis.length, 2, 'valores de exemplo são recusados');
+  const ok = await healthDe({ NODE_ENV: 'production', ADMIN_PASS: 'uma-senha-forte-123', SESSION_SECRET: 'segredo-bem-longo-e-aleatorio-1234' }, PORT + 506);
+  assert.equal(ok.status, 200); assert.equal(ok.config, 200);
 });
 test('dados persistem entre reinicializações', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-qa-persist-'));
