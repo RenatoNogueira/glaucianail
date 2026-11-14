@@ -1,7 +1,7 @@
 # Relatório de QA — Agenda Manicure & Pé de Curi
 
 Escopo: API (Express), armazenamento, sessões, regras de agendamento e prontidão para a Vercel.
-Método: revisão de código + suíte automatizada (`npm test`, 49 testes). Os testes foram escritos **antes** das
+Método: revisão de código + suíte automatizada (`npm test`, 68 testes). Os testes foram escritos **antes** das
 correções; 15 falharam no código original e todos passam agora.
 
 ## Bloqueadores para a Vercel (arquitetura)

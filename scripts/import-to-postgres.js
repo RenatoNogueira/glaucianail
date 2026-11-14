@@ -1,5 +1,7 @@
-// Copia os dados locais (data/db.json + logo) para as tabelas do Postgres/Supabase, sem apagar nada do banco.
-// Uso:
+// Copia os dados locais (data/db.json + logo) para o Supabase, sem apagar nada do banco.
+// Uso (API do Supabase, recomendado — rode antes o supabase/schema.sql):
+//   SUPABASE_URL="https://SEU-REF.supabase.co" SUPABASE_SECRET_KEY="sb_secret_..." node scripts/import-to-postgres.js [--force]
+// Ou, com conexão Postgres direta:
 //   DATABASE_URL="postgresql://..." node scripts/import-to-postgres.js [--force]
 // Por segurança, se o banco de destino já tiver clientes ou agendamentos, o script recusa (use --force para sobrescrever).
 const fs = require('fs');
@@ -7,15 +9,16 @@ const path = require('path');
 const { createStore } = require('../lib/store');
 const { DEFAULT_SERVICES } = require('../lib/defaults');
 
-const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-if (!url) { console.error('Defina DATABASE_URL (a string de conexão do Postgres).'); process.exit(1); }
+const url = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+const supabaseUrl = process.env.SUPABASE_URL || '', supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+if (!url && !(supabaseUrl && supabaseKey)) { console.error('Defina SUPABASE_URL + SUPABASE_SECRET_KEY (ou DATABASE_URL).'); process.exit(1); }
 const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, '..', 'data');
 const file = path.join(dataDir, 'db.json');
 if (!fs.existsSync(file)) { console.error('Não encontrei', file); process.exit(1); }
 
 (async () => {
   const local = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const store = createStore({ defaultServices: DEFAULT_SERVICES, databaseUrl: url });
+  const store = createStore({ defaultServices: DEFAULT_SERVICES, databaseUrl: url, supabaseUrl, supabaseKey });
   try {
     const r = await store.importDocument(local, { force: process.argv.includes('--force') });
     const ext = local.settings && local.settings.logo;

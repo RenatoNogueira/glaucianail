@@ -41,11 +41,13 @@ const store = createStore({
   defaultServices: DEFAULT_SERVICES,
   dataDir: env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(__dirname, 'data'),
   databaseUrl: env.DATABASE_URL || env.POSTGRES_URL || env.POSTGRES_PRISMA_URL || '',
+  supabaseUrl: env.SUPABASE_URL || '',
+  supabaseKey: env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '', // chave SECRETA: só no servidor, nunca no navegador
   requirePg: !!env.VERCEL,
 });
 const { db, save, LOGO_TYPES } = store;
 const nextId = () => ++db.seq;
-if (PROD && store.kind === 'arquivo') console.warn('⚠ Produção sem DATABASE_URL: os dados ficarão em arquivo e podem ser perdidos (ex.: na Vercel).');
+if (PROD && store.kind === 'arquivo') console.warn('⚠ Produção sem banco configurado (DATABASE_URL ou SUPABASE_URL + SUPABASE_SECRET_KEY): os dados ficarão em arquivo e podem ser perdidos (ex.: na Vercel).');
 
 const getStudio = () => db.settings.studio || STUDIO;
 const logoUrl = () => (db.settings.logo && store.logo.exists() ? `/logo?v=${db.settings.logoV}` : null);
@@ -153,9 +155,12 @@ app.use('/api', (req, res, next) => {
 // Diagnóstico: testa a conexão com o banco e explica a causa provável (sem expor senha/host). Abra /api/health
 const dicaBanco = (e) => {
   const m = String(e.message || ''), c = String(e.code || '');
-  if (c === 'SEM_DATABASE_URL') return 'Defina DATABASE_URL (string do Transaction pooler do Supabase) em Settings → Environment Variables da Vercel e faça um novo deploy.';
+  if (c === 'SEM_DATABASE_URL') return 'Defina SUPABASE_URL e SUPABASE_SECRET_KEY (ou DATABASE_URL) em Settings → Environment Variables da Vercel e faça Redeploy.';
+  if (c === 'SCHEMA_AUSENTE' || c === 'PGRST202') return 'As funções do banco ainda não existem. No Supabase → SQL Editor, rode o conteúdo de supabase/schema.sql (uma vez) e recarregue.';
+  if (c === 'PGRST301' || c === '401' || c === '403' || /invalid api key|jwt|apikey/i.test(m)) return 'Chave recusada pelo Supabase. Confira SUPABASE_SECRET_KEY (use a chave SECRETA, não a publishable) e se SUPABASE_URL é do mesmo projeto.';
   if (/tenant or user not found/i.test(m)) return 'Usuário/projeto do pooler incorreto. Copie de novo a string em Supabase → Connect → Transaction pooler (usuário no formato postgres.SEU_REF).';
   if (c === '28P01' || /password authentication failed/i.test(m)) return 'Senha do banco incorreta. Confira a senha (caracteres como @ # / ? precisam ser codificados na URL, ex.: @ vira %40).';
+  if ((c === 'ENOTFOUND' || c === 'EAI_AGAIN') && env.SUPABASE_URL && !env.DATABASE_URL) return 'Não encontrou o servidor do Supabase. Confira SUPABASE_URL (ex.: https://SEU-REF.supabase.co).';
   if (c === 'ENOTFOUND' || c === 'EAI_AGAIN') return 'Host do banco não encontrado. Use o host do Transaction pooler (aws-0-REGIAO.pooler.supabase.com), não o host direto db.REF.supabase.co.';
   if (c === 'ECONNREFUSED' || c === 'ETIMEDOUT' || /timeout/i.test(m)) return 'Não conseguiu conectar. Use a porta 6543 do Transaction pooler (a conexão direta 5432 é só IPv6 e falha na Vercel) e confira se o projeto Supabase não está pausado.';
   if (/self.signed|certificate/i.test(m)) return 'Problema de certificado SSL. Remova DATABASE_SSL_CA ou use o certificado correto do Supabase.';
@@ -508,6 +513,8 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   if (res.headersSent) return next(err);
   if (err.type === 'entity.parse.failed') return res.status(400).json({ erro: 'JSON inválido.' });
   if (err.type === 'entity.too.large') return res.status(413).json({ erro: 'Arquivo muito grande.' });
+  if (err.code === 'LOCK_TIMEOUT') return res.status(503).json({ erro: 'Muitos pedidos ao mesmo tempo. Tente de novo em instantes.' });
+  if (/lock_lost/.test(String(err.message))) return res.status(503).json({ erro: 'A operação demorou demais e foi cancelada. Tente de novo.' });
   if (err.code === '23505') return res.status(409).json({ erro: 'Conflito: este horário ou cadastro acabou de ser ocupado. Atualize e tente de novo.' }); // violação de unicidade no banco
   console.error('Erro:', err);
   res.status(500).json({ erro: 'Erro interno. Tente novamente em instantes.' });

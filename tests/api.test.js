@@ -36,7 +36,7 @@ function client() {
 }
 
 async function startServer(extraEnv = {}, dataDir = DATA, port = PORT) {
-  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', NODE_ENV: '', ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_ENV: '', ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
   p.log = '';
   p.stdout.on('data', (d) => (p.log += d)); p.stderr.on('data', (d) => (p.log += d));
   for (let i = 0; i < 60; i++) {
@@ -292,7 +292,7 @@ test('agenda: excluir vários horários de uma vez (reservados são preservados)
 // ---------- Diagnóstico de implantação (Vercel) ----------
 async function healthDe(extraEnv, port) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-qa-diag-'));
-  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', POSTGRES_PRISMA_URL: '', NODE_ENV: '', VERCEL: '', ...extraEnv }, stdio: 'ignore' });
+  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', POSTGRES_PRISMA_URL: '', SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_ENV: '', VERCEL: '', ...extraEnv }, stdio: 'ignore' });
   try {
     for (let i = 0; i < 80; i++) {
       try { const r = await fetch(`http://127.0.0.1:${port}/api/health`); return { status: r.status, json: await r.json(), config: (await fetch(`http://127.0.0.1:${port}/api/config`)).status }; } catch { await sleep(150); }
@@ -315,4 +315,37 @@ test('banco inacessível: /api/health informa código e dica, sem expor a string
 test('saúde OK no modo arquivo', async () => {
   const h = await healthDe({}, PORT + 720);
   assert.equal(h.status, 200); assert.equal(h.json.ok, true); assert.equal(h.json.armazenamento, 'arquivo');
+});
+
+// ---------- Diagnóstico no modo API do Supabase ----------
+const { startMock } = require('./helpers/mock-supabase');
+test('Supabase API: funções do banco ausentes -> /api/health manda rodar supabase/schema.sql', async () => {
+  const m = await startMock({ key: 'sb_secret_ok' }); m.flags.semFuncoes = true;
+  try {
+    const h = await healthDe({ SUPABASE_URL: m.url, SUPABASE_SECRET_KEY: 'sb_secret_ok' }, PORT + 730);
+    assert.equal(h.status, 503); assert.equal(h.json.codigo, 'SCHEMA_AUSENTE'); assert.match(h.json.dica, /schema.sql/);
+  } finally { await m.close(); }
+});
+test('Supabase API: chave errada -> dica para usar a chave secreta (e a chave não vaza)', async () => {
+  const m = await startMock({ key: 'sb_secret_certa' });
+  try {
+    const h = await healthDe({ SUPABASE_URL: m.url, SUPABASE_SECRET_KEY: 'sb_secret_ERRADA_123' }, PORT + 740);
+    assert.equal(h.status, 503); assert.equal(h.json.codigo, 'PGRST301'); assert.match(h.json.dica, /SECRETA|secreta/);
+    assert.ok(!JSON.stringify(h.json).includes('ERRADA_123'));
+  } finally { await m.close(); }
+});
+test('Supabase API: funcionando -> health ok com armazenamento supabase-api', async () => {
+  const m = await startMock({ key: 'sb_secret_ok' });
+  try {
+    const h = await healthDe({ SUPABASE_URL: m.url, SUPABASE_SECRET_KEY: 'sb_secret_ok' }, PORT + 750);
+    assert.equal(h.status, 200); assert.equal(h.json.armazenamento, 'supabase-api');
+  } finally { await m.close(); }
+});
+test('Supabase API: chave legada (JWT) também vai em Authorization', async () => {
+  const m = await startMock({ key: 'eyJhbGciOi.legada.chave' });
+  try {
+    const h = await healthDe({ SUPABASE_URL: m.url, SUPABASE_SECRET_KEY: 'eyJhbGciOi.legada.chave' }, PORT + 760);
+    assert.equal(h.status, 200);
+    assert.equal(m.calls.at(-1).headers.authorization, 'Bearer eyJhbGciOi.legada.chave');
+  } finally { await m.close(); }
 });

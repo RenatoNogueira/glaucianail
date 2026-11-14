@@ -18,10 +18,10 @@ aprova ou recusa no painel e a resposta segue para o **WhatsApp** da cliente.
 npm install
 cp .env.example .env      # ajuste ADMIN_PASS e SESSION_SECRET
 npm start                 # http://localhost:3000  (admin: /admin.html)
-npm test                  # 53 testes automatizados
+npm test                  # 68 testes automatizados
 ```
 
-Sem `DATABASE_URL`, os dados ficam em `data/db.json` (com backups automáticos em `data/backups`).
+Sem banco configurado (`SUPABASE_URL` + `SUPABASE_SECRET_KEY`, ou `DATABASE_URL`), os dados ficam em `data/db.json` (com backups automáticos em `data/backups`).
 
 ## Deploy (Vercel + Supabase)
 
