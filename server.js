@@ -38,6 +38,7 @@ const store = createStore({
   defaultServices: DEFAULT_SERVICES,
   dataDir: env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(__dirname, 'data'),
   databaseUrl: env.DATABASE_URL || env.POSTGRES_URL || env.POSTGRES_PRISMA_URL || '',
+  requirePg: !!env.VERCEL,
 });
 const { db, save, LOGO_TYPES } = store;
 const nextId = () => ++db.seq;
@@ -139,12 +140,33 @@ app.use('/api', (req, res, next) => {
   } catch {}
   res.status(403).json({ erro: 'Origem não permitida.' });
 });
+// Diagnóstico: testa a conexão com o banco e explica a causa provável (sem expor senha/host). Abra /api/health
+const dicaBanco = (e) => {
+  const m = String(e.message || ''), c = String(e.code || '');
+  if (c === 'SEM_DATABASE_URL') return 'Defina DATABASE_URL (string do Transaction pooler do Supabase) em Settings → Environment Variables da Vercel e faça um novo deploy.';
+  if (/tenant or user not found/i.test(m)) return 'Usuário/projeto do pooler incorreto. Copie de novo a string em Supabase → Connect → Transaction pooler (usuário no formato postgres.SEU_REF).';
+  if (c === '28P01' || /password authentication failed/i.test(m)) return 'Senha do banco incorreta. Confira a senha (caracteres como @ # / ? precisam ser codificados na URL, ex.: @ vira %40).';
+  if (c === 'ENOTFOUND' || c === 'EAI_AGAIN') return 'Host do banco não encontrado. Use o host do Transaction pooler (aws-0-REGIAO.pooler.supabase.com), não o host direto db.REF.supabase.co.';
+  if (c === 'ECONNREFUSED' || c === 'ETIMEDOUT' || /timeout/i.test(m)) return 'Não conseguiu conectar. Use a porta 6543 do Transaction pooler (a conexão direta 5432 é só IPv6 e falha na Vercel) e confira se o projeto Supabase não está pausado.';
+  if (/self.signed|certificate/i.test(m)) return 'Problema de certificado SSL. Remova DATABASE_SSL_CA ou use o certificado correto do Supabase.';
+  if (c === '42501' || /permission denied/i.test(m)) return 'O usuário do banco não tem permissão para criar o schema. Rode supabase/schema.sql no SQL Editor do Supabase.';
+  if (c === 'EROFS' || c === 'EACCES') return 'Tentou gravar em disco (somente leitura na Vercel). Defina DATABASE_URL.';
+  return 'Veja os logs da função em Vercel → Deployments → Functions/Logs para o detalhe.';
+};
+app.get('/api/health', wrap(async (req, res) => {
+  const base = { hoje: todayStr(), tz: TZ_NAME, armazenamento: store.kind, vercel: !!env.VERCEL };
+  try { await store.init(); res.json({ ok: true, ...base }); }
+  catch (e) {
+    console.error('Health: falha ao iniciar o banco:', e);
+    res.status(503).json({ ok: false, ...base, etapa: 'banco', codigo: e.code || e.name || 'ERRO', dica: dicaBanco(e) });
+  }
+}));
+
 app.use('/api', sessions.middleware, store.middleware);
 
 const needClient = (req, res, next) => (req.session.userId && db.users.some((u) => u.id === req.session.userId) ? next() : res.status(401).json({ erro: 'Faça login.' }));
 const needAdmin = (req, res, next) => (req.session.admin ? next() : res.status(401).json({ erro: 'Acesso restrito.' }));
 
-app.get('/api/health', (req, res) => res.json({ ok: true, hoje: todayStr(), tz: TZ_NAME, armazenamento: store.kind }));
 app.get('/api/config', (req, res) => res.json({ studio: getStudio(), logo: logoUrl(), servicos: db.services.filter((s) => s.ativo) }));
 
 // ----- Cliente -----
@@ -485,6 +507,7 @@ module.exports = app;
 module.exports.store = store;
 
 if (require.main === module) {
-  store.init().then(() => app.listen(PORT, () => console.log(`Agenda rodando em http://localhost:${PORT}  (admin: /admin.html) · armazenamento: ${store.kind}`)))
-    .catch((e) => { console.error('Falha ao iniciar:', e); process.exit(1); });
+  // Sobe o servidor mesmo que o banco esteja inacessível: /api/health mostra o diagnóstico e as próximas requisições tentam reconectar
+  store.init().catch((e) => console.error('✖ Banco indisponível na inicialização:', e.code || e.message));
+  app.listen(PORT, () => console.log(`Agenda rodando em http://localhost:${PORT}  (admin: /admin.html) · armazenamento: ${store.kind}`));
 }

@@ -277,4 +277,11 @@ async function init() {
   $('who').textContent = me ? 'Olá, ' + me.name.split(' ')[0] : '';
   if (me) { show('book'); refreshBadge(); } else loadLanding();
 }
-init();
+// Se o servidor/banco estiver indisponível, mostra uma mensagem amigável em vez de uma página em branco
+function initOuErro() {
+  init().catch(() => {
+    document.querySelector('main').innerHTML = '<div class="card empty" style="margin-top:40px"><span class="big">🛠️</span><strong>Sistema temporariamente indisponível</strong><br>Não foi possível carregar os dados agora. Tente novamente em instantes.<br><br><button class="btn" id="retry">Tentar novamente</button></div>';
+    document.getElementById('retry').onclick = () => location.reload();
+  });
+}
+initOuErro();

@@ -60,21 +60,34 @@ Ou conecte o repositório no painel. **Framework Preset: Other** (o `vercel.json
 
 > Se o build falhar com *"No entrypoint found which imports express"*: é a detecção automática de Express da Vercel. Confirme em *Settings → Build & Development* que o preset é **Other** (não "Express"). O backend é a função `api/index.js`, que carrega `server.js`.
 
-## 4. Smoke test (faça após o primeiro deploy)
+## 4. Erro 500 ao abrir o site? Use o diagnóstico
+Abra `https://SEU-DOMINIO/api/health`. Se o banco não conecta, ele responde `503` com o **código** do erro e uma **dica** da causa (sem expor senha):
+
+| Código / mensagem | Causa provável |
+|---|---|
+| `SEM_DATABASE_URL` | variável `DATABASE_URL` não definida na Vercel (depois de definir, faça **Redeploy**) |
+| `Tenant or user not found` | usuário errado: use o formato `postgres.SEU_REF` do *Transaction pooler* |
+| `28P01` | senha incorreta (caracteres especiais precisam ser codificados: `@` → `%40`) |
+| `ENOTFOUND` | host errado: use `aws-0-REGIAO.pooler.supabase.com`, não `db.REF.supabase.co` |
+| `ECONNREFUSED` / `ETIMEDOUT` | porta errada (use **6543**) ou projeto Supabase pausado |
+
+O detalhe completo do erro fica nos logs: Vercel → *Deployments* → *Functions* / *Logs*.
+
+## 5. Smoke test (faça após o primeiro deploy)
 1. `https://SEU-DOMINIO/api/health` → deve mostrar `"armazenamento":"postgres"` e a data de hoje no fuso do Brasil.
    Se der erro de conexão: confira se usou o **pooler (6543)** e se a senha está codificada.
 2. No Supabase → *Table Editor* → escolha o schema `agenda`: as 6 tabelas devem existir e `services` deve ter 4 linhas.
 3. Abra `/admin.html`, entre, libere horários na aba **Agenda**.
 4. Em uma janela anônima, cadastre uma cliente e faça um agendamento; aprove no painel e confira o link de WhatsApp.
 
-## 5. Levar os dados locais para o Supabase (opcional)
+## 6. Levar os dados locais para o Supabase (opcional)
 Se você já tem clientes/agendamentos em `data/db.json`:
 ```bash
 DATABASE_URL="postgresql://postgres.SEU_REF:SENHA@aws-0-REGIAO.pooler.supabase.com:6543/postgres" npm run import:pg
 ```
 O script **recusa** sobrescrever um banco que já tenha clientes ou agendamentos (use `--force` só se tiver certeza) e também envia a logo.
 
-## 6. Backups e atualizações
+## 7. Backups e atualizações
 - Dados e logo ficam no Postgres: atualizar o código **não** apaga nada.
 - Backups: botão **Baixar backup** (Configurações) + backups do Supabase (diários nos planos pagos; no plano gratuito, baixe o backup com frequência).
 - Mudanças futuras na estrutura dos dados são tratadas por `migrate()` em `lib/store.js` (nunca descarta registros).
@@ -84,6 +97,6 @@ O script **recusa** sobrescrever um banco que já tenha clientes ou agendamentos
 ```bash
 npm install
 npm start      # usa data/db.json (ou o Postgres, se DATABASE_URL estiver definida)
-npm test       # 49 testes
+npm test       # 53 testes
 npm run schema # regenera supabase/schema.sql (após mudar lib/schema.js)
 ```

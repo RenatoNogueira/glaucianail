@@ -286,3 +286,31 @@ test('agenda: excluir vários horários de uma vez (reservados são preservados)
   assert.deepEqual(depois.map((s) => s.time), ['10:00']);
   assert.equal(depois[0].ocupado, true);
 });
+
+// ---------- Diagnóstico de implantação (Vercel) ----------
+async function healthDe(extraEnv, port) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-qa-diag-'));
+  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', POSTGRES_PRISMA_URL: '', NODE_ENV: '', VERCEL: '', ...extraEnv }, stdio: 'ignore' });
+  try {
+    for (let i = 0; i < 80; i++) {
+      try { const r = await fetch(`http://127.0.0.1:${port}/api/health`); return { status: r.status, json: await r.json(), config: (await fetch(`http://127.0.0.1:${port}/api/config`)).status }; } catch { await sleep(150); }
+    }
+    throw new Error('servidor não subiu');
+  } finally { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
+}
+test('Vercel sem DATABASE_URL: /api/health explica o problema (e /api/config falha de forma controlada)', async () => {
+  const h = await healthDe({ VERCEL: '1' }, PORT + 700);
+  assert.equal(h.status, 503); assert.equal(h.json.ok, false); assert.equal(h.json.codigo, 'SEM_DATABASE_URL');
+  assert.match(h.json.dica, /DATABASE_URL/); assert.equal(h.config, 500);
+  assert.ok(!JSON.stringify(h.json).includes('senha-de-teste'), 'não vaza segredos');
+});
+test('banco inacessível: /api/health informa código e dica, sem expor a string de conexão', async () => {
+  const h = await healthDe({ DATABASE_URL: 'postgresql://usuario:SENHA-SECRETA@127.0.0.1:1/db' }, PORT + 710);
+  assert.equal(h.status, 503); assert.equal(h.json.ok, false); assert.match(h.json.codigo, /ECONNREFUSED|ETIMEDOUT|AggregateError/);
+  assert.match(h.json.dica, /6543|pooler|conectar/i);
+  assert.ok(!JSON.stringify(h.json).includes('SENHA-SECRETA'));
+});
+test('saúde OK no modo arquivo', async () => {
+  const h = await healthDe({}, PORT + 720);
+  assert.equal(h.status, 200); assert.equal(h.json.ok, true); assert.equal(h.json.armazenamento, 'arquivo');
+});
