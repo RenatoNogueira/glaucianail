@@ -9,7 +9,7 @@ aprova ou recusa no painel e a resposta segue para o **WhatsApp** da cliente.
 
 - **Cliente:** cadastro/login por WhatsApp, agendamento em 3 passos (serviço → data e hora → confirmação), histórico e cancelamento.
 - **Administradora:** visão geral, aprovação/recusa com mensagem de WhatsApp, agenda de horários (publicação em lote e exclusão em massa),
-  CRUD de serviços (com biblioteca de ícones), clientes, nome e logo do estúdio, backup.
+  CRUD de serviços (com biblioteca de ícones), clientes, nome e logo do estúdio, **edição dos textos da página inicial**, backup.
 - Modo claro/escuro, layout responsivo (menu lateral no computador, barra de abas no celular).
 
 ## Rodando localmente
@@ -18,7 +18,7 @@ aprova ou recusa no painel e a resposta segue para o **WhatsApp** da cliente.
 npm install
 cp .env.example .env      # ajuste ADMIN_PASS e SESSION_SECRET
 npm start                 # http://localhost:3000  (admin: /admin.html)
-npm test                  # 68 testes automatizados
+npm test                  # 69 testes automatizados
 ```
 
 Sem banco configurado (`SUPABASE_URL` + `SUPABASE_SECRET_KEY`, ou `DATABASE_URL`), os dados ficam em `data/db.json` (com backups automáticos em `data/backups`).

@@ -35,6 +35,7 @@ const ADMIN_HASH = bcrypt.hashSync(env.ADMIN_PASS || 'admin123', 10);
 if (!PROD && !env.ADMIN_PASS) console.warn('⚠ Usando senha de admin padrão. Defina ADMIN_PASS no .env.');
 
 const { DEFAULT_SERVICES } = require('./lib/defaults');
+const landing = require('./lib/landing');
 
 // --- Armazenamento (arquivo local ou PostgreSQL) ---
 const store = createStore({
@@ -182,7 +183,7 @@ app.use('/api', sessions.middleware, store.middleware);
 const needClient = (req, res, next) => (req.session.userId && db.users.some((u) => u.id === req.session.userId) ? next() : res.status(401).json({ erro: 'Faça login.' }));
 const needAdmin = (req, res, next) => (req.session.admin ? next() : res.status(401).json({ erro: 'Acesso restrito.' }));
 
-app.get('/api/config', (req, res) => res.json({ studio: getStudio(), logo: logoUrl(), servicos: db.services.filter((s) => s.ativo) }));
+app.get('/api/config', (req, res) => res.json({ studio: getStudio(), logo: logoUrl(), textos: landing.mesclar(db.settings.landing), servicos: db.services.filter((s) => s.ativo) }));
 
 // ----- Cliente -----
 app.post('/api/register', wrap(async (req, res) => {
@@ -498,6 +499,16 @@ app.delete('/api/admin/settings/logo', needAdmin, wrap(async (req, res) => {
   await store.logo.del(); db.settings.logo = null;
   await save();
   res.json({ studio: getStudio(), logo: null });
+}));
+
+// ----- Textos da página inicial (editáveis pela admin) -----
+app.get('/api/admin/landing', needAdmin, (req, res) => res.json({ grupos: landing.GRUPOS, campos: landing.CAMPOS, valores: db.settings.landing || {} }));
+app.put('/api/admin/landing', needAdmin, wrap(async (req, res) => {
+  const r = landing.validar((req.body || {}).valores);
+  if (r.erro) return res.status(400).json({ erro: r.erro });
+  db.settings.landing = r.valores; // só o que foi preenchido; o resto usa o texto padrão
+  await save();
+  res.json({ valores: r.valores, textos: landing.mesclar(r.valores) });
 }));
 
 // ----- Backup manual (download do banco completo) -----

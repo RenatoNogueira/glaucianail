@@ -94,6 +94,6 @@ Ela tem prioridade sobre `SUPABASE_URL`. Nesse modo o sistema cria as tabelas so
 ```bash
 npm install
 npm start      # usa data/db.json (ou o Supabase, se SUPABASE_URL + SUPABASE_SECRET_KEY estiverem no .env)
-npm test       # 68 testes
+npm test       # 69 testes
 npm run schema # regenera supabase/schema.sql (após mudar lib/schema.js ou lib/rpc-sql.js)
 ```

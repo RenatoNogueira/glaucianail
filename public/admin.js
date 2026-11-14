@@ -27,6 +27,7 @@ const NAV = [
   ['agenda', '🗓️', 'Agenda', 'Defina os dias e horários de atendimento', 'Agenda'],
   ['serv', '💅', 'Serviços', 'Cadastre serviços, preços e duração', 'Serviços'],
   ['cli', '👥', 'Clientes', 'Gerencie suas clientes', 'Clientes'],
+  ['landing', '🖼️', 'Página inicial', 'Edite os textos que as clientes veem ao abrir o site', 'Site'],
   ['cfg', '⚙️', 'Configurações', 'Nome, logo e cópia de segurança', 'Ajustes'],
 ];
 function renderNav() {
@@ -38,14 +39,16 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-v],[data-go]');
   if (b) view(b.dataset.v || b.dataset.go);
 });
-const loaders = { home: () => loadHome(), req: () => load(), agenda: () => loadSlots(), serv: () => loadServices(), cli: () => loadClients(), cfg: () => loadCfg() };
+const loaders = { home: () => loadHome(), req: () => load(), agenda: () => loadSlots(), serv: () => loadServices(), cli: () => loadClients(), landing: () => loadLanding(), cfg: () => loadCfg() };
 function view(v) {
   cur = v; const n = NAV.find((x) => x[0] === v);
   NAV.forEach(([k]) => $('v-' + k).classList.toggle('hidden', k !== v));
   $('pgTitle').textContent = n[2];
   $('pgSub').textContent = v === 'home' ? 'Hoje é ' + new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) : n[3];
-  $('pgAct').innerHTML = v === 'serv' ? '<button class="btn" id="newServ">+ Novo serviço</button>' : '';
+  $('pgAct').innerHTML = v === 'serv' ? '<button class="btn" id="newServ">+ Novo serviço</button>'
+    : v === 'landing' ? '<div class="row" style="gap:8px;flex-wrap:nowrap"><a class="btn sec sm" href="/" target="_blank" rel="noopener">🌐 Ver o site</a><button type="button" class="btn bad sm" id="ldReset">Restaurar tudo</button></div>' : '';
   if (v === 'serv') $('newServ').onclick = () => serviceForm();
+  if (v === 'landing') $('ldReset').onclick = ldResetAll;
   renderNav(); window.scrollTo({ top: 0 });
   loaders[v]();
 }
@@ -508,6 +511,81 @@ async function renderDay(date) {
   $('dGen').onclick = () => api('/api/admin/slots/bulk', 'POST', { from: date, to: date, interval: $('dI').value, schedule: { [new Date(date + 'T12:00:00').getDay()]: [{ start: $('dS').value, end: $('dE').value }] } })
     .then((r) => done(`${r.adicionados} horários adicionados`)).catch(fail);
   $('dClr').onclick = () => api('/api/admin/slots/clear-day', 'POST', { date }).then((r) => done(`${r.removidos} horários removidos`)).catch(fail);
+}
+
+// ---------- Página inicial: editar os textos ----------
+const LD = { campos: [], grupos: [], valores: {}, salvo: {} };
+const ldVal = (c) => LD.valores[c.key] || '';
+const ldEfetivo = (key) => { const c = LD.campos.find((x) => x.key === key); return (LD.valores[key] && LD.valores[key].trim()) || (c && c.padrao) || ''; };
+const ldDirty = () => JSON.stringify(ldLimpo(LD.valores)) !== JSON.stringify(ldLimpo(LD.salvo));
+const ldLimpo = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v && v.trim()).sort(([a], [b]) => a.localeCompare(b)));
+
+async function loadLanding() {
+  $('ldBody').innerHTML = skeleton(3);
+  const r = await api('/api/admin/landing');
+  LD.campos = r.campos; LD.grupos = r.grupos; LD.valores = { ...r.valores }; LD.salvo = { ...r.valores };
+  renderLanding();
+}
+
+function ldFieldHtml(c) {
+  const v = ldVal(c), id = 'ld_' + c.key;
+  const input = c.tipo === 'texto'
+    ? `<textarea id="${id}" data-k="${c.key}" rows="2" maxlength="${c.max}" placeholder="${esc(c.padrao)}">${esc(v)}</textarea>`
+    : `<input id="${id}" data-k="${c.key}" maxlength="${c.max}" value="${esc(v)}" placeholder="${esc(c.padrao)}">`;
+  return `<div class="fld"><label for="${id}">${esc(c.rotulo)}</label>${input}
+    <div class="fld-foot"><span class="small">${c.dica ? esc(c.dica) : ''}</span>
+      <span class="cnt" data-cnt="${c.key}">${v.length}/${c.max}</span>
+      <button type="button" class="link sm" data-reset="${c.key}" ${v ? '' : 'hidden'}>↺ Padrão</button></div></div>`;
+}
+
+function renderLanding() {
+  $('ldBody').innerHTML = `
+    <div class="card ld-prev"><div class="flabel">Pré-visualização do topo da página <span class="small">(atualiza enquanto você digita)</span></div><div class="lp-copy" id="ldPrev"></div></div>
+    <p class="small" style="margin:0 0 14px">Deixe um campo vazio para usar o texto padrão (aparece em cinza). As alterações só vão para o site quando você clicar em <strong>Salvar textos</strong>.</p>
+    ${LD.grupos.map(([g, nome]) => `<div class="card"><h2 style="margin-bottom:6px">${esc(nome)}</h2>${LD.campos.filter((c) => c.grupo === g).map(ldFieldHtml).join('')}</div>`).join('')}`;
+  ldPreview(); ldBar();
+}
+
+// Marcação: *palavra* vira destaque (o texto é escapado antes, então nada digitado vira HTML)
+const ldRich = (t) => esc(t).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+function ldPreview() {
+  const p = $('ldPrev'); if (!p) return;
+  const e = ldEfetivo;
+  p.innerHTML = `<span class="lp-badge">${esc(e('badge'))}</span>
+    <h1>${ldRich(e('titulo'))}</h1><p class="lp-sub">${esc(e('subtitulo'))}</p>
+    <ul class="lp-perks"><li><b>⚡</b> ${esc(e('vantagem1'))}</li><li><b>📲</b> ${esc(e('vantagem2'))}</li><li><b>🗓️</b> ${esc(e('vantagem3'))}</li></ul>
+    <div class="lp-cta"><span class="btn lg">${esc(e('botaoPrincipal'))}</span><span class="btn sec lg">${esc(e('botaoSecundario'))}</span></div>`;
+}
+function ldBar() { $('ldBar').classList.toggle('hidden', !ldDirty()); }
+
+$('ldBody').addEventListener('input', (e) => {
+  const k = e.target.dataset.k; if (!k) return;
+  LD.valores[k] = e.target.value;
+  const c = LD.campos.find((x) => x.key === k);
+  document.querySelector(`[data-cnt="${k}"]`).textContent = `${e.target.value.length}/${c.max}`;
+  document.querySelector(`[data-reset="${k}"]`).hidden = !e.target.value;
+  ldPreview(); ldBar();
+});
+$('ldBody').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-reset]'); if (!b) return;
+  const k = b.dataset.reset, inp = $('ld_' + k);
+  inp.value = ''; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.focus();
+});
+$('ldSave').onclick = async () => {
+  try {
+    const r = await api('/api/admin/landing', 'PUT', { valores: ldLimpo(LD.valores) });
+    LD.valores = { ...r.valores }; LD.salvo = { ...r.valores };
+    toast('Textos salvos! Já estão no site ✓', 'ok'); ldBar();
+  } catch (err) { toast(err.message, 'err'); }
+};
+$('ldDiscard').onclick = () => { LD.valores = { ...LD.salvo }; renderLanding(); };
+function ldResetAll() {
+  modal({
+    title: 'Restaurar todos os textos?', html: '<p class="small">A página inicial volta aos textos originais. Isso apaga as suas edições.</p>',
+    actions: [{ label: 'Voltar', cls: 'sec' }, { label: 'Restaurar tudo', cls: 'bad', onClick: async (close) => {
+      try { await api('/api/admin/landing', 'PUT', { valores: {} }); toast('Textos restaurados', 'ok'); close(); loadLanding(); } catch (err) { toast(err.message, 'err'); }
+    } }],
+  });
 }
 
 async function init() {

@@ -3,6 +3,21 @@ const DIAS_FULL = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', '
 let mode = 'login', cfg, me = null, view = 'book', step = 1;
 let sel = { service: null, date: null, time: null, notes: '' };
 let avail = {}, nextSlots = [];
+let T = {}; // textos da página inicial (editáveis no painel)
+
+// Aplica os textos da página inicial. Tudo entra como texto puro (nunca HTML); *palavra* vira destaque.
+function applyTexts(t) {
+  T = t || {};
+  document.querySelectorAll('[data-t]').forEach((el) => {
+    const v = T[el.dataset.t]; if (typeof v !== 'string') return;
+    if (el.hasAttribute('data-rich')) {
+      el.textContent = '';
+      v.split(/(\*[^*]+\*)/).filter(Boolean).forEach((p) => {
+        if (/^\*[^*]+\*$/.test(p)) { const em = document.createElement('em'); em.textContent = p.slice(1, -1); el.append(em); } else el.append(document.createTextNode(p));
+      });
+    } else el.textContent = v;
+  });
+}
 
 const svc = () => cfg.servicos.find((x) => x.id === sel.service);
 const rel = (iso) => {
@@ -21,7 +36,7 @@ function setMode(m) {
   $('tLogin').classList.toggle('on', m === 'login');
   $('tReg').classList.toggle('on', m === 'reg');
   $('pass').autocomplete = m === 'login' ? 'current-password' : 'new-password';
-  $('authTitle').textContent = m === 'login' ? 'Bem-vinda de volta' : 'Crie sua conta';
+  $('authTitle').textContent = (m === 'login' ? T.authLoginTitulo : T.authCadastroTitulo) || (m === 'login' ? 'Bem-vinda de volta' : 'Crie sua conta');
   $('authMsg').innerHTML = '';
 }
 // Atalhos da página inicial: levam ao formulário já no modo certo
@@ -37,7 +52,7 @@ async function loadLanding() {
   $('lpServices').innerHTML = cfg.servicos.map((s) => `
     <div class="lp-svc"><span class="lp-ic">${esc(s.icone || ICONS[s.id] || '💅')}</span>
       <strong>${esc(s.nome)}</strong><span class="small">${s.minutos} min</span><span class="price">R$ ${Number(s.preco).toFixed(2).replace('.', ',')}</span></div>`).join('');
-  $('lpFoot').textContent = `© ${new Date().getFullYear()} ${cfg.studio} · Agendamento online`;
+  $('lpFoot').textContent = (T.rodape || '© {ano} {nome} · Agendamento online').split('{ano}').join(new Date().getFullYear()).split('{nome}').join(cfg.studio);
   try {
     const n = await api('/api/next-slots?limit=4');
     $('lpNextSec').hidden = !n.length;
@@ -267,6 +282,7 @@ async function refreshBadge() {
 async function init() {
   cfg = cfg || (await api('/api/config'));
   applyBrand(cfg);
+  applyTexts(cfg.textos); setMode(mode);
   document.title = cfg.studio + ' – Agendamento';
   const r = await api('/api/me');
   me = r.user;

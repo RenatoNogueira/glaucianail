@@ -349,3 +349,35 @@ test('Supabase API: chave legada (JWT) também vai em Authorization', async () =
     assert.equal(m.calls.at(-1).headers.authorization, 'Bearer eyJhbGciOi.legada.chave');
   } finally { await m.close(); }
 });
+
+// ---------- Textos da página inicial ----------
+test('página inicial: padrão público, edição pela admin, limites e restauração', async () => {
+  const pub = client();
+  const padrao = (await pub('/api/config')).json.textos;
+  assert.equal(padrao.botaoPrincipal, 'Agendar agora'); assert.match(padrao.titulo, /cuidados/);
+  assert.equal((await pub('/api/admin/landing')).status, 401);
+  assert.equal((await pub('/api/admin/landing', { method: 'PUT', body: { valores: {} } })).status, 401);
+
+  const g = await admin('/api/admin/landing');
+  assert.equal(g.status, 200); assert.ok(g.json.campos.length >= 20); assert.ok(g.json.grupos.length >= 5); assert.deepEqual(g.json.valores, {});
+
+  const ok = await admin('/api/admin/landing', { method: 'PUT', body: { valores: { titulo: '  Studio *Glaucia* — unhas  perfeitas  ', botaoPrincipal: 'Quero agendar', subtitulo: '' } } });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(ok.json.valores, { titulo: 'Studio *Glaucia* — unhas perfeitas', botaoPrincipal: 'Quero agendar' }, 'espaços normalizados; vazio não é guardado');
+  const cfg = (await pub('/api/config')).json.textos;
+  assert.equal(cfg.titulo, 'Studio *Glaucia* — unhas perfeitas'); assert.equal(cfg.botaoPrincipal, 'Quero agendar');
+  assert.equal(cfg.subtitulo, padrao.subtitulo, 'campo não editado mantém o padrão');
+
+  assert.equal((await admin('/api/admin/landing', { method: 'PUT', body: { valores: { naoExiste: 'x' } } })).status, 400);
+  assert.equal((await admin('/api/admin/landing', { method: 'PUT', body: { valores: { badge: 'x'.repeat(200) } } })).status, 400);
+  assert.equal((await admin('/api/admin/landing', { method: 'PUT', body: { valores: { badge: 123 } } })).status, 400);
+  assert.equal((await admin('/api/admin/landing', { method: 'PUT', body: { valores: [] } })).status, 400);
+  assert.equal((await pub('/api/config')).json.textos.botaoPrincipal, 'Quero agendar', 'pedido inválido não altera nada');
+
+  // HTML digitado fica como texto (o front usa textContent); quebras de linha viram espaço
+  const x = await admin('/api/admin/landing', { method: 'PUT', body: { valores: { badge: '<img src=x onerror=alert(1)>\nlinha 2' } } });
+  assert.equal(x.json.valores.badge, '<img src=x onerror=alert(1)> linha 2');
+
+  assert.equal((await admin('/api/admin/landing', { method: 'PUT', body: { valores: {} } })).status, 200);
+  assert.equal((await pub('/api/config')).json.textos.botaoPrincipal, 'Agendar agora', 'restaurado');
+});
