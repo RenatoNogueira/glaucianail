@@ -476,3 +476,12 @@ img,video,svg{max-width:100%}
   .lp-cta .btn{padding-left:12px;padding-right:12px}
 }
 
+
+/* ---------- Logo maior ---------- */
+.brand i.has-logo{width:56px;height:56px;border-radius:12px}
+.topbar>div{padding-top:8px;padding-bottom:8px}
+.side-brand{gap:12px}
+.side-brand i.has-logo{width:60px;height:60px}
+.al-logo.has-logo{width:84px;height:84px;border-radius:20px;background:transparent}
+.al-logo img{width:100%;height:100%;object-fit:contain;display:block}
+@media (max-width:899px){.brand i.has-logo{width:48px;height:48px}}
