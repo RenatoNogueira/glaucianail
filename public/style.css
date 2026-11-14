@@ -485,3 +485,26 @@ img,video,svg{max-width:100%}
 .al-logo.has-logo{width:84px;height:84px;border-radius:20px;background:transparent}
 .al-logo img{width:100%;height:100%;object-fit:contain;display:block}
 @media (max-width:899px){.brand i.has-logo{width:48px;height:48px}}
+
+/* ---------- Calendário mensal (Agenda) ---------- */
+.mc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.mc-head strong{font-size:1.15rem;text-transform:capitalize}
+.mc-w,.mc-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.mc-w span{text-align:center;font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;padding-bottom:4px}
+.mcd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;padding:4px 2px;border:1.5px solid var(--line,rgba(125,107,118,.25));border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.mcd b{font-size:1rem}
+.mcd small{font-size:.62rem;line-height:1.1;color:var(--muted);text-align:center}
+.mcd:hover:not(:disabled){border-color:var(--rose)}
+.mcd:active:not(:disabled){transform:scale(.96)}
+.mcd:disabled{opacity:.35;cursor:not-allowed}
+.mcd.hasfree{background:rgba(46,160,110,.12)}
+.mcd.hasfree small{color:#2a8a5e}
+.mcd.hasbusy:not(.hasfree){background:rgba(194,69,111,.12)}
+.mcd.today b{color:var(--rose);text-decoration:underline}
+.mcd.sel{background:var(--rose);border-color:var(--rose);color:#fff}
+.mcd.sel small{color:rgba(255,255,255,.9)}
+.mc-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px}
+.mc-legend .lg{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:baseline}
+.lg.free{background:rgba(46,160,110,.6)}.lg.busy{background:rgba(194,69,111,.6)}.lg.none{border:1.5px solid var(--muted)}
+#mcRanges{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+@media (max-width:520px){.mcd{min-height:50px}.mcd small{font-size:.56rem}}

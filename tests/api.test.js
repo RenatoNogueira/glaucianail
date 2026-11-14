@@ -424,3 +424,14 @@ test('PWA: vercel.json encaminha o manifesto para a função', () => {
   assert.ok(fontes.includes('/manifest.webmanifest') && !fontes.includes('/manifest-admin.webmanifest'));
   assert.ok(v.headers.some((h) => h.source === '/sw.js'));
 });
+
+test('agenda: calendário mensal publica só nos dias escolhidos', async () => {
+  const d1 = iso(addDays(40)), d2 = iso(addDays(47));
+  const todos = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, [{ start: '09:00', end: '10:00' }]]));
+  assert.equal((await admin('/api/admin/slots/bulk', { method: 'POST', body: { dates: [], interval: 60, schedule: todos } })).status, 400, 'sem dias');
+  assert.equal((await admin('/api/admin/slots/bulk', { method: 'POST', body: { dates: ['2026-02-31'], interval: 60, schedule: todos } })).status, 400, 'data inválida');
+  const r = await admin('/api/admin/slots/bulk', { method: 'POST', body: { dates: [d1, d2], interval: 60, schedule: todos } });
+  assert.equal(r.json.adicionados, 4);
+  const dias = new Set((await admin('/api/admin/slots')).json.filter((s) => s.date >= d1 && s.date <= d2).map((s) => s.date));
+  assert.deepEqual([...dias].sort(), [d1, d2].sort(), 'dias do meio ficam sem horários');
+});

@@ -370,9 +370,10 @@ $('fSlots').onsubmit = async (e) => {
 
 // ----- Agenda: abas Gerenciar / Publicar -----
 function agTab(t) {
-  $('agManage').classList.toggle('hidden', t !== 'manage'); $('agPublish').classList.toggle('hidden', t !== 'publish');
+  $('agManage').classList.toggle('hidden', t !== 'manage'); $('agPublish').classList.toggle('hidden', t !== 'publish'); $('agMonth').classList.toggle('hidden', t !== 'month');
   $('agTabs').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.t === t));
-  if (t === 'publish') $('agBar').classList.add('hidden'); else renderManage();
+  if (t !== 'manage') $('agBar').classList.add('hidden'); else renderManage();
+  if (t === 'month') renderMonth();
 }
 $('agTabs').querySelectorAll('button').forEach((b) => (b.onclick = () => agTab(b.dataset.t)));
 
@@ -443,11 +444,88 @@ function renderManage() {
     });
   }
   renderBar();
+  if (!$('agMonth').classList.contains('hidden')) renderMonth();
 }
+
+// ----- Calendário mensal: cada mês tem o seu calendário -----
+const mc = { y: new Date().getFullYear(), m: new Date().getMonth(), sel: new Set(), ranges: [{ start: '09:00', end: '12:00' }, { start: '14:00', end: '18:00' }] };
+const mcPad = (n) => String(n).padStart(2, '0');
+$('mcW').innerHTML = DIAS.map((d) => `<span>${d.slice(0, 3)}</span>`).join('');
+
+function mcDays() { // [{iso, d, wd}] do mês exibido
+  const n = new Date(mc.y, mc.m + 1, 0).getDate();
+  return Array.from({ length: n }, (_, i) => ({ iso: `${mc.y}-${mcPad(mc.m + 1)}-${mcPad(i + 1)}`, d: i + 1, wd: new Date(mc.y, mc.m, i + 1).getDay() }));
+}
+function renderMonth() {
+  const today = ISO(new Date()), days = mcDays(), cur = `${mc.y}-${mcPad(mc.m + 1)}`;
+  const stat = {}; ag.all.forEach((x) => { if (x.date.startsWith(cur)) { const s = stat[x.date] = stat[x.date] || { free: 0, busy: 0 }; x.ocupado ? s.busy++ : s.free++; } });
+  for (const iso of [...mc.sel]) if (iso < today) mc.sel.delete(iso);
+  $('mcTitle').textContent = `${MESES_FULL[mc.m]} ${mc.y}`;
+  $('mcPrev').disabled = cur <= today.slice(0, 7);
+  $('mcG').innerHTML = '<span></span>'.repeat(new Date(mc.y, mc.m, 1).getDay()) + days.map(({ iso, d }) => {
+    const s = stat[iso], past = iso < today;
+    const cls = ['mcd', iso === today ? 'today' : '', mc.sel.has(iso) ? 'sel' : '', s && s.free ? 'hasfree' : '', s && s.busy ? 'hasbusy' : ''].join(' ');
+    return `<button type="button" class="${cls}" data-iso="${iso}" ${past ? 'disabled' : ''} aria-pressed="${mc.sel.has(iso)}" aria-label="${d} de ${MESES_FULL[mc.m]}${s ? `, ${s.free} livres, ${s.busy} reservados` : ', sem horários'}">
+      <b>${d}</b><small>${s ? (s.free ? s.free + ' livre' + (s.free > 1 ? 's' : '') : '') + (s.busy ? `${s.free ? ' · ' : ''}${s.busy} res.` : '') : '—'}</small></button>`;
+  }).join('');
+  const fut = days.filter((x) => x.iso >= today);
+  $('mcQuick').innerHTML = WD_SHORT.map(([n, l]) => `<button type="button" class="chip" data-wd="${n}" ${fut.some((x) => x.wd === n) ? '' : 'disabled'}>Todas as ${l.toLowerCase()}.</button>`).join('')
+    + `<button type="button" class="chip" data-q="util">Dias úteis</button><button type="button" class="chip" data-q="all">Mês todo</button><button type="button" class="chip" data-q="none">Limpar seleção</button>`;
+  renderMcPanel();
+}
+function renderMcPanel() {
+  const n = mc.sel.size;
+  $('mcSelTxt').textContent = n ? `${n} ${n === 1 ? 'dia selecionado' : 'dias selecionados'}` : 'Nenhum dia selecionado';
+  $('mcSelHint').classList.toggle('hidden', !!n);
+  $('mcForm').classList.toggle('hidden', !n);
+  $('mcEdit').classList.toggle('hidden', n !== 1);
+  $('mcRanges').innerHTML = mc.ranges.map((r, i) => `<span class="rg"><input type="time" data-i="${i}" data-k="start" value="${r.start}" aria-label="Início"> <i>às</i> <input type="time" data-i="${i}" data-k="end" value="${r.end}" aria-label="Fim">${mc.ranges.length > 1 ? `<button type="button" class="x" data-rm="${i}" aria-label="Remover faixa">×</button>` : ''}</span>`).join('');
+  const step = +$('mcInt').value; let per = 0;
+  mc.ranges.forEach((r) => { if (r.start && r.end && mins(r.end) >= mins(r.start)) per += Math.floor((mins(r.end) - mins(r.start)) / step) + 1; });
+  $('mcInfo').textContent = n ? `Serão publicados até ${per * n} horários (${per} por dia).` : '';
+}
+const mcSet = (iso, on) => (on ? mc.sel.add(iso) : mc.sel.delete(iso));
+const mcMove = (d) => { const t = new Date(mc.y, mc.m + d, 1); mc.y = t.getFullYear(); mc.m = t.getMonth(); renderMonth(); };
+$('mcPrev').onclick = () => mcMove(-1);
+$('mcNext').onclick = () => mcMove(1);
+$('mcG').onclick = (e) => { const b = e.target.closest('[data-iso]'); if (!b || b.disabled) return; mcSet(b.dataset.iso, !mc.sel.has(b.dataset.iso)); renderMonth(); };
+$('mcQuick').onclick = (e) => {
+  const b = e.target.closest('.chip'); if (!b || b.disabled) return;
+  const today = ISO(new Date()), fut = mcDays().filter((x) => x.iso >= today);
+  if (b.dataset.q === 'none') mc.sel.clear();
+  else if (b.dataset.q === 'all') fut.forEach((x) => mc.sel.add(x.iso));
+  else if (b.dataset.q === 'util') fut.filter((x) => x.wd >= 1 && x.wd <= 5).forEach((x) => mc.sel.add(x.iso));
+  else { const ds = fut.filter((x) => x.wd === +b.dataset.wd), all = ds.every((x) => mc.sel.has(x.iso)); ds.forEach((x) => mcSet(x.iso, !all)); }
+  renderMonth();
+};
+$('mcRanges').onchange = (e) => { const t = e.target; if (t.dataset.k) { mc.ranges[+t.dataset.i][t.dataset.k] = t.value; renderMcPanel(); } };
+$('mcRanges').onclick = (e) => { const b = e.target.closest('[data-rm]'); if (b) { mc.ranges.splice(+b.dataset.rm, 1); renderMcPanel(); } };
+$('mcAddRange').onclick = () => { const l = mc.ranges[mc.ranges.length - 1], s = l ? l.end : '09:00'; mc.ranges.push({ start: s, end: hhmm(Math.min(mins(s) + 180, 1439)) }); renderMcPanel(); };
+$('mcInt').onchange = renderMcPanel;
+$('mcApply').onclick = async () => {
+  const dates = [...mc.sel].sort();
+  if (mc.ranges.some((r) => !r.start || !r.end || mins(r.end) < mins(r.start))) return toast('Há uma faixa de horário inválida (o fim deve ser depois do início).', 'err');
+  const schedule = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, mc.ranges.map((r) => ({ ...r }))]));
+  try {
+    const r = await api('/api/admin/slots/bulk', 'POST', { dates, interval: $('mcInt').value, schedule, replace: $('mcReplace').checked });
+    toast(`${r.adicionados} horários adicionados` + (r.ignorados ? ` (${r.ignorados} já existiam)` : '') + (r.removidos ? ` · ${r.removidos} antigos removidos` : ''), 'ok');
+    await loadSlots();
+  } catch (err) { toast(err.message, 'err'); }
+};
+$('mcClear').onclick = () => {
+  const dates = new Set(mc.sel), ids = ag.all.filter((x) => dates.has(x.date) && !x.ocupado).map((x) => x.id);
+  if (!ids.length) return toast('Os dias escolhidos não têm horários livres.', 'ok');
+  confirmDelete('Limpar horários livres?', `<strong>${ids.length}</strong> ${ids.length === 1 ? 'horário livre será removido' : 'horários livres serão removidos'} de ${dates.size} ${dates.size === 1 ? 'dia' : 'dias'}. Horários reservados nunca são apagados.`, async () => {
+    const r = await api('/api/admin/slots/delete-many', 'POST', { ids });
+    await loadSlots();
+    return `${r.removidos} ${r.removidos === 1 ? 'horário excluído' : 'horários excluídos'}`;
+  });
+};
+$('mcEdit').onclick = () => openDay([...mc.sel][0]);
 
 function renderBar() {
   const n = ag.sel.size;
-  $('agBar').classList.toggle('hidden', !n || !$('agPublish').classList.contains('hidden'));
+  $('agBar').classList.toggle('hidden', !n || $('agManage').classList.contains('hidden'));
   $('agBarTxt').textContent = `${n} ${n === 1 ? 'horário selecionado' : 'horários selecionados'}`;
 }
 

@@ -335,7 +335,15 @@ app.get('/api/admin/slots', needAdmin, (req, res) => {
 
 // schedule: { "1": [{start:"09:00", end:"12:00"}, ...], ... } (chave = dia da semana, 0 = domingo)
 app.post('/api/admin/slots/bulk', needAdmin, wrap(async (req, res) => {
-  const { from, to, interval, schedule, replace } = req.body || {};
+  const body = req.body || {};
+  const { interval, schedule, replace } = body;
+  // "dates": lista de datas escolhidas no calendário (alternativa a from/to)
+  let dates = null, { from, to } = body;
+  if (body.dates !== undefined) {
+    if (!Array.isArray(body.dates) || !body.dates.length || body.dates.length > 400 || !body.dates.every(isDate)) return res.status(400).json({ erro: 'Escolha ao menos um dia no calendário.' });
+    dates = new Set(body.dates);
+    const ord = [...dates].sort(); from = ord[0]; to = ord[ord.length - 1];
+  }
   if (!isDate(from) || !isDate(to) || to < from) return res.status(400).json({ erro: 'Informe um período de datas válido.' });
   if ((new Date(to) - new Date(from)) / 864e5 > 400) return res.status(400).json({ erro: 'O período máximo é de 400 dias.' });
   if (!schedule || typeof schedule !== 'object') return res.status(400).json({ erro: 'Defina os horários de atendimento.' });
@@ -347,13 +355,14 @@ app.post('/api/admin/slots/bulk', needAdmin, wrap(async (req, res) => {
   const out = [];
   for (let d = new Date(from + 'T12:00:00Z'), last = new Date(to + 'T12:00:00Z'); d <= last; d.setUTCDate(d.getUTCDate() + 1)) {
     const date = d.toISOString().slice(0, 10);
+    if (dates && !dates.has(date)) continue;
     for (const r of schedule[d.getUTCDay()] || []) for (let t = toMin(r.start); t <= toMin(r.end); t += step) out.push({ date, time: toHHMM(t) });
   }
   if (out.length > 800) return res.status(400).json({ erro: 'Muitos horários de uma vez (máx. 800). Reduza o período.' });
   let removed = 0;
   if (replace) { // apaga só os horários livres do período; os reservados são preservados
     const before = db.slots.length;
-    db.slots = db.slots.filter((x) => x.date < from || x.date > to || isTaken(x.date, x.time));
+    db.slots = db.slots.filter((x) => x.date < from || x.date > to || (dates && !dates.has(x.date)) || isTaken(x.date, x.time));
     removed = before - db.slots.length;
   }
   const have = new Set(db.slots.map((s) => s.date + ' ' + s.time));

@@ -75,7 +75,37 @@
       <div id="v-agenda" class="hidden">
         <div class="seg ag-seg" id="agTabs" role="tablist">
           <button type="button" class="on" data-t="manage">🗂️ Gerenciar agenda</button>
+          <button type="button" data-t="month">📆 Calendário mensal</button>
           <button type="button" data-t="publish">➕ Publicar horários</button>
+        </div>
+
+        <!-- Calendário mensal: cada mês tem o seu calendário; escolha os dias e defina os horários -->
+        <div id="agMonth" class="hidden">
+          <div class="card">
+            <div class="mc-head">
+              <button type="button" class="cal-nav" id="mcPrev" aria-label="Mês anterior">‹</button>
+              <strong id="mcTitle"></strong>
+              <button type="button" class="cal-nav" id="mcNext" aria-label="Próximo mês">›</button>
+            </div>
+            <div class="mc-w" id="mcW"></div>
+            <div class="mc-g" id="mcG"></div>
+            <div class="mc-legend small"><span><i class="lg free"></i>horários livres</span><span><i class="lg busy"></i>reservados</span><span><i class="lg none"></i>sem horários</span></div>
+            <div class="flabel" style="margin-top:12px">Seleção rápida</div>
+            <div class="chips" id="mcQuick"></div>
+          </div>
+          <div class="card" id="mcPanel">
+            <h2 style="margin-bottom:4px" id="mcSelTxt">Nenhum dia selecionado</h2>
+            <p class="small" id="mcSelHint">Toque nos dias do calendário para escolher onde publicar horários.</p>
+            <div id="mcForm" class="hidden">
+              <label>Horários de atendimento nos dias escolhidos</label>
+              <div id="mcRanges"></div>
+              <button type="button" class="link" id="mcAddRange">+ faixa</button>
+              <div class="row2"><div><label for="mcInt">Intervalo entre horários</label><select id="mcInt"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 hora</option><option value="90">1h30</option><option value="120">2 horas</option></select></div><div></div></div>
+              <label class="chk"><input type="checkbox" id="mcReplace"> Substituir os horários livres já publicados nesses dias</label>
+              <p class="small" id="mcInfo" style="margin-top:8px"></p>
+              <div class="row" style="margin-top:8px"><button type="button" class="btn" id="mcApply">Publicar nos dias escolhidos</button><button type="button" class="btn bad sm" id="mcClear">🗑 Limpar livres</button><button type="button" class="btn sec sm" id="mcEdit">Editar dia</button></div>
+            </div>
+          </div>
         </div>
 
         <!-- Gerenciar: filtrar, selecionar e excluir em massa -->
