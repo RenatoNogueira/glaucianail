@@ -1,0 +1,157 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#2d1f2b">
+<title>Admin – Agendamentos</title><link rel="stylesheet" href="style.css"></head><body class="admin">
+
+<!-- Login -->
+<section id="login" class="alogin hidden">
+  <button type="button" class="theme float" data-theme-toggle>🌙</button>
+  <div class="al-card">
+    <aside class="al-side">
+      <div class="al-logo" data-brand-logo data-fallback="🔐">🔐</div>
+      <h1>Painel do estúdio</h1>
+      <p class="al-studio" data-brand-name></p>
+      <ul>
+        <li><b>✅</b> Aprove pedidos e avise pelo WhatsApp</li>
+        <li><b>🗓️</b> Defina dias e horários de atendimento</li>
+        <li><b>💅</b> Cadastre serviços e preços</li>
+        <li><b>👥</b> Acompanhe suas clientes</li>
+      </ul>
+      <a class="al-back" href="/">← Voltar ao site</a>
+    </aside>
+    <div class="al-form">
+      <span class="lp-badge">Acesso restrito</span>
+      <h2>Entrar no painel</h2>
+      <p class="small">Use o usuário e a senha de administrador.</p>
+      <form id="fLogin" novalidate>
+        <label for="user">Usuário</label>
+        <input id="user" autocomplete="username" autocapitalize="none" spellcheck="false">
+        <label for="pass">Senha</label>
+        <div class="pw"><input id="pass" type="password" autocomplete="current-password"><button type="button" class="link" id="eye">Mostrar</button></div>
+        <div id="loginMsg" aria-live="polite"></div>
+        <button class="btn block lg" id="loginBtn" style="margin-top:16px">Entrar no painel</button>
+      </form>
+      <p class="small al-note">🔒 Por segurança, a sessão expira após 8 horas.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Painel -->
+<div id="shell" class="shell hidden">
+  <aside class="side">
+    <div class="brand side-brand"><i data-brand-logo data-fallback="💅">💅</i><span data-brand-name></span></div>
+    <nav class="snav" id="snav" aria-label="Menu principal"></nav>
+    <div class="side-foot">
+      <button type="button" class="sn-item" data-theme-toggle><span class="ni">🌙</span><span class="tl">Modo escuro</span></button>
+      <a class="sn-item" href="/" target="_blank" rel="noopener"><span class="ni">🌐</span><span class="tl">Ver o site</span></a>
+      <button type="button" class="sn-item" id="logout"><span class="ni">🚪</span><span class="tl">Sair</span></button>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="mtop">
+      <div class="brand"><i data-brand-logo data-fallback="💅">💅</i><span data-brand-name></span></div>
+      <div class="end"><button type="button" class="theme" data-theme-toggle>🌙</button><button type="button" class="btn sec sm" id="logoutM">Sair</button></div>
+    </header>
+
+    <main class="pane">
+      <div class="ph"><div><h1 id="pgTitle"></h1><p class="small" id="pgSub"></p></div><div id="pgAct"></div></div>
+
+      <!-- Visão geral -->
+      <div id="v-home">
+        <div class="stats" id="stats"></div>
+        <div class="card"><div class="toolbar"><h2>⏳ Aguardando aprovação</h2><button class="link" data-go="req">Ver todos →</button></div><div id="homePend"></div></div>
+        <div class="card"><div class="toolbar"><h2>📅 Próximos atendimentos</h2><button class="link" data-go="agenda">Ver agenda →</button></div><div id="homeNext"></div></div>
+      </div>
+
+      <!-- Agendamentos -->
+      <div id="v-req" class="hidden">
+        <div class="card">
+          <div class="toolbar"><div class="nav" id="tabs"></div><div class="pop" id="fpop"><button type="button" class="btn sec sm" id="fbtn">📅 Todas as datas</button><div class="pop-panel hidden" id="fpanel"><div id="fcal"></div><div class="row" style="margin-top:10px"><button type="button" class="btn sec sm" id="fclear">Limpar filtro</button></div></div></div></div>
+          <div id="list"></div>
+        </div>
+      </div>
+
+      <!-- Agenda -->
+      <div id="v-agenda" class="hidden">
+        <div class="seg ag-seg" id="agTabs" role="tablist">
+          <button type="button" class="on" data-t="manage">🗂️ Gerenciar agenda</button>
+          <button type="button" data-t="publish">➕ Publicar horários</button>
+        </div>
+
+        <!-- Gerenciar: filtrar, selecionar e excluir em massa -->
+        <div id="agManage">
+          <div class="card">
+            <div class="ag-filters">
+              <div><div class="flabel">Período</div><div class="chips" id="agPeriod"></div></div>
+              <div><div class="flabel">Dias da semana</div><div class="chips" id="agWd"></div></div>
+              <div><div class="flabel">Selecionar um horário em todos os dias <span class="small">(ex.: tirar o das 12:00)</span></div><div class="chips" id="agTimes"></div></div>
+            </div>
+            <div class="ag-sum"><span id="agSummary" class="small"></span><div class="ag-sumbtns"><button type="button" class="btn sec sm" id="agSelAll">Selecionar todos os livres</button></div></div>
+          </div>
+          <div class="card"><div id="slotList"></div></div>
+          <div class="selbar hidden" id="agBar" role="region" aria-label="Ações em massa">
+            <strong id="agBarTxt"></strong>
+            <div class="row" style="flex:0 0 auto;flex-wrap:nowrap"><button type="button" class="btn sec sm" id="agBarClear">Cancelar</button><button type="button" class="btn bad sm" id="agBarDel">🗑 Excluir selecionados</button></div>
+          </div>
+        </div>
+
+        <!-- Publicar novos horários -->
+        <div id="agPublish" class="hidden">
+        <div class="card">
+          <h2 style="margin-bottom:4px">Liberar horários</h2>
+          <p class="small">Defina os dias e horários em que você atende. Só eles aparecerão para as clientes, e cada horário some assim que for reservado.</p>
+          <form id="fSlots">
+            <div class="step" style="margin-top:14px"><h2>Dias e horários de atendimento</h2></div>
+            <div class="quick" id="presets"><span class="small" style="align-self:center">Modelos:</span>
+              <button type="button" data-t="comercial">Comercial</button><button type="button" data-t="manha">Só manhã</button>
+              <button type="button" data-t="tarde">Só tarde</button><button type="button" data-t="limpar">Limpar</button></div>
+            <div id="week"></div>
+            <p class="small">Dica: use <strong>+ faixa</strong> para criar pausas (ex.: 09:00–12:00 e 14:00–18:00).</p>
+            <div class="row2">
+              <div><label for="sInt">Intervalo entre horários</label><select id="sInt"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 hora</option><option value="90">1h30</option><option value="120">2 horas</option></select></div>
+              <div><label for="sWeeks">Publicar para as próximas</label><select id="sWeeks"><option value="1">1 semana</option><option value="2">2 semanas</option><option value="4" selected>4 semanas</option><option value="8">8 semanas</option><option value="12">12 semanas</option></select></div></div>
+            <label class="chk"><input type="checkbox" id="sReplace"> Substituir os horários livres já publicados nesse intervalo</label>
+            <p class="small" id="sPrev" style="margin-top:10px"></p>
+            <button class="btn" style="margin-top:6px">Adicionar à agenda</button>
+          </form>
+        </div>
+        </div>
+      </div>
+
+      <!-- Serviços -->
+      <div id="v-serv" class="hidden"><div class="card"><div id="servList"></div></div></div>
+
+      <!-- Clientes -->
+      <div id="v-cli" class="hidden"><div class="card"><input id="cliQ" placeholder="🔎 Buscar por nome ou WhatsApp" style="margin-bottom:8px"><div id="cliList"></div></div></div>
+
+      <!-- Configurações -->
+      <div id="v-cfg" class="hidden">
+        <div class="card">
+          <h2>Identidade do estúdio</h2>
+          <p class="small">Nome e logo aparecem para as clientes, nas mensagens de WhatsApp e neste painel.</p>
+          <div class="id-row">
+            <div class="logo-prev" id="cfgLogo"></div>
+            <div class="id-actions">
+              <div class="row" style="gap:8px"><button type="button" class="btn sm" id="logoPick">📷 Enviar logo</button><button type="button" class="btn bad sm" id="logoDel">Remover</button></div>
+              <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" hidden>
+              <p class="small" style="margin:8px 0 0">PNG, JPG ou WEBP. Ajustamos o tamanho automaticamente; fundo transparente (PNG) fica melhor.</p>
+            </div>
+          </div>
+          <label for="cfgName">Nome da empresa</label>
+          <div class="row" style="flex-wrap:nowrap"><input id="cfgName" maxlength="60" placeholder="Ex.: Studio Bella Unhas"><button type="button" class="btn" id="cfgSave" style="flex:0 0 auto;min-width:0">Salvar</button></div>
+          <p class="small" style="margin:8px 0 0">Deixe em branco para usar o nome padrão do sistema.</p>
+        </div>
+        <div class="card">
+          <h2>Seus dados</h2>
+          <p class="small">Uma cópia de segurança completa (clientes, agendamentos, serviços e horários). Guarde em local seguro: ela contém dados pessoais.</p>
+          <a class="btn sec" href="/api/admin/backup" download>💾 Baixar backup</a>
+          <p class="small" style="margin-top:10px">O sistema também faz backups automáticos todos os dias na pasta de dados.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <nav class="tabbar" id="tabbar" aria-label="Menu"></nav>
+</div>
+
+<script src="ui.js"></script><script src="admin.js"></script></body></html>

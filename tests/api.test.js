@@ -1,0 +1,288 @@
+// Testes de QA da API. Rode com:  npm test
+// Sobe o servidor em uma pasta de dados temporária (nunca toca nos seus dados reais).
+const { test, before, after } = require('node:test');
+const assert = require('node:assert/strict');
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const ROOT = path.join(__dirname, '..');
+const PORT = 4100 + Math.floor(Math.random() * 400);
+const BASE = `http://127.0.0.1:${PORT}`;
+const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-qa-'));
+const ADMIN = { user: 'admin', password: 'senha-de-teste-123' };
+let proc;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const iso = (d) => d.toLocaleDateString('sv-SE');
+const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
+
+// Cliente HTTP com "jar" de cookies
+function client() {
+  let cookie = '';
+  return async (url, { method = 'GET', body, headers = {}, raw } = {}) => {
+    const r = await fetch(BASE + url, {
+      method,
+      headers: { ...(body !== undefined && !raw ? { 'Content-Type': 'application/json' } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
+      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
+    });
+    const sc = r.headers.getSetCookie?.() || [];
+    if (sc.length) cookie = sc.map((c) => c.split(';')[0]).join('; ');
+    const text = await r.text();
+    let json = null; try { json = JSON.parse(text); } catch {}
+    return { status: r.status, json, text, headers: r.headers, setCookie: sc };
+  };
+}
+
+async function startServer(extraEnv = {}, dataDir = DATA, port = PORT) {
+  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', NODE_ENV: '', ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
+  p.log = '';
+  p.stdout.on('data', (d) => (p.log += d)); p.stderr.on('data', (d) => (p.log += d));
+  for (let i = 0; i < 60; i++) {
+    try { const r = await fetch(`http://127.0.0.1:${port}/api/config`); if (r.ok) return p; } catch {}
+    if (p.exitCode !== null) break;
+    await sleep(150);
+  }
+  return p;
+}
+
+before(async () => { proc = await startServer(); });
+after(() => { proc?.kill(); try { fs.rmSync(DATA, { recursive: true, force: true }); } catch {} });
+
+const admin = client();
+const novoCliente = async (n) => {
+  const c = client();
+  const tel = `11${String(900000000 + n * 7919).slice(0, 9)}`;
+  const r = await c('/api/register', { method: 'POST', body: { name: `Cliente ${n}`, phone: tel, password: 'senha123' } });
+  assert.equal(r.status, 200, 'cadastro deveria funcionar: ' + r.text);
+  return { c, tel };
+};
+
+// ---------- Cadastro e login ----------
+test('cadastro: valida nome, telefone e senha', async () => {
+  const c = client();
+  assert.equal((await c('/api/register', { method: 'POST', body: { name: 'A', phone: '11912345678', password: '123456' } })).status, 400);
+  assert.equal((await c('/api/register', { method: 'POST', body: { name: 'Maria', phone: '123', password: '123456' } })).status, 400);
+  assert.equal((await c('/api/register', { method: 'POST', body: { name: 'Maria', phone: '11912345678', password: '123' } })).status, 400);
+});
+test('cadastro: nome gigante é recusado', async () => {
+  const c = client();
+  const r = await c('/api/register', { method: 'POST', body: { name: 'x'.repeat(500), phone: '11911112222', password: '123456' } });
+  assert.equal(r.status, 400);
+});
+test('cadastro: telefone com dígitos demais é recusado', async () => {
+  const c = client();
+  const r = await c('/api/register', { method: 'POST', body: { name: 'Maria', phone: '1191234567812345678', password: '123456' } });
+  assert.equal(r.status, 400);
+});
+test('cadastro: WhatsApp duplicado (mesmo número, formatos diferentes) é recusado', async () => {
+  const a = client(), b = client();
+  assert.equal((await a('/api/register', { method: 'POST', body: { name: 'Ana Dup', phone: '(11) 98888-7777', password: '123456' } })).status, 200);
+  assert.equal((await b('/api/register', { method: 'POST', body: { name: 'Ana Dup 2', phone: '11988887777', password: '123456' } })).status, 409);
+});
+test('login: erro genérico e sucesso', async () => {
+  const c = client();
+  assert.equal((await c('/api/login', { method: 'POST', body: { phone: '11988887777', password: 'errada' } })).status, 401);
+  const ok = await c('/api/login', { method: 'POST', body: { phone: '(11) 98888-7777', password: '123456' } });
+  assert.equal(ok.status, 200);
+  assert.equal((await c('/api/me')).json.user.name, 'Ana Dup');
+});
+test('sessão: cookie é HttpOnly e SameSite', async () => {
+  const c = client();
+  const r = await c('/api/login', { method: 'POST', body: { phone: '11988887777', password: '123456' } });
+  const ck = r.setCookie.join(';').toLowerCase();
+  assert.match(ck, /httponly/); assert.match(ck, /samesite=/);
+});
+test('sessão: cookie adulterado é ignorado', async () => {
+  const c = client();
+  const r = await c('/api/me', { headers: { Cookie: 'sid=eyJ1Ijoz.fake' } });
+  assert.equal(r.json.user, null); assert.equal(r.json.admin, false);
+});
+test('rotas protegidas exigem login', async () => {
+  const c = client();
+  for (const [m, u] of [['GET', '/api/appointments'], ['POST', '/api/appointments'], ['GET', '/api/admin/appointments'], ['GET', '/api/admin/clients'], ['GET', '/api/admin/backup'], ['PUT', '/api/admin/settings'], ['DELETE', '/api/admin/services/manicure']]) {
+    assert.equal((await c(u, { method: m, body: m === 'GET' ? undefined : {} })).status, 401, `${m} ${u}`);
+  }
+});
+
+// ---------- Administrador ----------
+test('admin: login incorreto e correto', async () => {
+  const c = client();
+  assert.equal((await c('/api/admin/login', { method: 'POST', body: { user: 'admin', password: 'x' } })).status, 401);
+  assert.equal((await admin('/api/admin/login', { method: 'POST', body: ADMIN })).status, 200);
+});
+test('admin: login tem limite de tentativas (força bruta)', async () => {
+  const c = client();
+  let last;
+  for (let i = 0; i < 12; i++) last = await c('/api/admin/login', { method: 'POST', body: { user: 'admin', password: 'errada' + i } });
+  assert.equal(last.status, 429, 'depois de várias falhas deveria bloquear');
+  const ok = await c('/api/admin/login', { method: 'POST', body: ADMIN });
+  assert.equal(ok.status, 429, 'mesmo a senha certa deve esperar o bloqueio');
+});
+
+const amanha = iso(addDays(1)), depois = iso(addDays(2));
+const diaSemana = (d) => new Date(d + 'T12:00:00').getDay();
+
+test('agenda: criar horários, validar entradas', async () => {
+  const sched = (d) => ({ [diaSemana(d)]: [{ start: '09:00', end: '11:00' }] });
+  assert.equal((await admin('/api/admin/slots/bulk', { method: 'POST', body: { from: '2026-02-31', to: '2026-03-02', interval: 60, schedule: { 1: [{ start: '09:00', end: '10:00' }] } } })).status, 400, 'data inexistente');
+  assert.equal((await admin('/api/admin/slots/bulk', { method: 'POST', body: { from: amanha, to: amanha, interval: 60, schedule: { 1: [{ start: '12:00', end: '09:00' }] } } })).status, 400, 'faixa invertida');
+  assert.equal((await admin('/api/admin/slots/bulk', { method: 'POST', body: { from: amanha, to: iso(addDays(900)), interval: 15, schedule: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, [{ start: '00:00', end: '23:45' }]])) } })).status, 400, 'excesso de horários');
+  const r = await admin('/api/admin/slots/bulk', { method: 'POST', body: { from: amanha, to: depois, interval: 60, schedule: { ...sched(amanha), ...sched(depois) } } });
+  assert.equal(r.status, 200); assert.equal(r.json.adicionados, 6);
+  assert.equal((await admin('/api/admin/slots/bulk', { method: 'POST', body: { from: amanha, to: depois, interval: 60, schedule: { ...sched(amanha), ...sched(depois) } } })).json.adicionados, 0, 'não duplica');
+});
+test('agenda pública: só mostra horários livres e futuros', async () => {
+  const c = client();
+  const d = await c('/api/available-days');
+  assert.equal(d.json[amanha], 3);
+  assert.deepEqual((await c(`/api/slots?date=${amanha}`)).json, ['09:00', '10:00', '11:00']);
+  assert.deepEqual((await c('/api/slots?date=2026-02-31')).json, []);
+  assert.deepEqual((await c('/api/slots?date=lixo')).json, []);
+  assert.deepEqual((await c(`/api/slots?date=${iso(addDays(-3))}`)).json, []);
+});
+
+// ---------- Agendamento ----------
+test('agendar: sucesso, horário some, repetir falha', async () => {
+  const { c } = await novoCliente(1);
+  const r = await c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: amanha, time: '09:00', notes: 'n'.repeat(1000) } });
+  assert.equal(r.status, 201); assert.equal(r.json.status, 'pendente'); assert.ok(r.json.notes.length <= 300);
+  assert.deepEqual((await c(`/api/slots?date=${amanha}`)).json, ['10:00', '11:00']);
+  assert.equal((await c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: amanha, time: '09:00' } })).status, 409);
+});
+test('agendar: horário não publicado, serviço inválido, data passada', async () => {
+  const { c } = await novoCliente(2);
+  assert.equal((await c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: amanha, time: '15:00' } })).status, 409);
+  assert.equal((await c('/api/appointments', { method: 'POST', body: { service: 'nao-existe', date: amanha, time: '10:00' } })).status, 400);
+  assert.equal((await c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: iso(addDays(-1)), time: '10:00' } })).status, 409);
+  assert.equal((await c('/api/appointments', { method: 'POST', body: {} })).status, 400);
+});
+test('agendar: 10 pedidos simultâneos no mesmo horário -> só 1 vence', async () => {
+  const cs = [];
+  for (let i = 0; i < 10; i++) cs.push((await novoCliente(100 + i)).c);
+  const rs = await Promise.all(cs.map((c) => c('/api/appointments', { method: 'POST', body: { service: 'pedicure', date: depois, time: '09:00' } })));
+  assert.equal(rs.filter((r) => r.status === 201).length, 1, 'exatamente um deve ganhar');
+  assert.equal(rs.filter((r) => r.status === 409).length, 9);
+});
+test('agendar: limite de pedidos ativos por cliente', async () => {
+  const { c } = await novoCliente(3);
+  const extra = iso(addDays(5));
+  await admin('/api/admin/slots/bulk', { method: 'POST', body: { from: extra, to: extra, interval: 30, schedule: { [diaSemana(extra)]: [{ start: '08:00', end: '12:00' }] } } });
+  const resultados = [];
+  for (const t of ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00']) resultados.push((await c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: extra, time: t } })).status);
+  assert.ok(resultados.includes(429) || resultados.includes(409), 'deveria limitar pedidos ativos: ' + resultados);
+  assert.ok(resultados.filter((s) => s === 201).length <= 5);
+});
+test('cancelar: libera horário; não cancela de outra pessoa', async () => {
+  const a = await novoCliente(4), b = await novoCliente(5);
+  const ag = (await a.c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: amanha, time: '10:00' } })).json;
+  assert.equal((await b.c(`/api/appointments/${ag.id}/cancel`, { method: 'POST' })).status, 404);
+  assert.equal((await a.c(`/api/appointments/${ag.id}/cancel`, { method: 'POST' })).status, 200);
+  assert.ok((await a.c(`/api/slots?date=${amanha}`)).json.includes('10:00'));
+  assert.equal((await a.c(`/api/appointments/${ag.id}/cancel`, { method: 'POST' })).status, 400, 'cancelar duas vezes');
+});
+
+// ---------- Aprovação ----------
+test('admin: aprovar/recusar só vale para pedidos pendentes', async () => {
+  const a = await novoCliente(6);
+  const ag = (await a.c('/api/appointments', { method: 'POST', body: { service: 'combo', date: amanha, time: '10:00' } })).json;
+  assert.equal((await admin(`/api/admin/appointments/${ag.id}/status`, { method: 'POST', body: { status: 'xyz' } })).status, 400);
+  const ok = await admin(`/api/admin/appointments/${ag.id}/status`, { method: 'POST', body: { status: 'aprovado', message: 'Até lá!' } });
+  assert.equal(ok.status, 200); assert.match(ok.json.whatsapp.link, /^https:\/\/wa\.me\/55\d+\?text=/);
+  assert.equal((await admin(`/api/admin/appointments/${ag.id}/status`, { method: 'POST', body: { status: 'recusado' } })).status, 409, 'já decidido');
+  await a.c(`/api/appointments/${ag.id}/cancel`, { method: 'POST' });
+  const re = await admin(`/api/admin/appointments/${ag.id}/status`, { method: 'POST', body: { status: 'aprovado' } });
+  assert.ok(re.status >= 400, 'não pode aprovar um pedido cancelado (status ' + re.status + ')');
+});
+
+// ---------- CRUD ----------
+test('serviços: criar, validar, editar, excluir, proteger o último ativo', async () => {
+  assert.equal((await admin('/api/admin/services', { method: 'POST', body: { nome: 'x', minutos: 5, preco: -1 } })).status, 400);
+  const s = await admin('/api/admin/services', { method: 'POST', body: { nome: 'Spa dos pés', minutos: 45, preco: 55.559, icone: '🌿' } });
+  assert.equal(s.status, 201); assert.equal(s.json.preco, 55.56);
+  assert.equal((await admin(`/api/admin/services/${s.json.id}`, { method: 'PUT', body: { nome: 'Spa', minutos: 30, preco: 40, ativo: false } })).json.ativo, false);
+  assert.ok(!(await client()('/api/config')).json.servicos.some((x) => x.id === s.json.id), 'inativo não aparece');
+  assert.equal((await admin(`/api/admin/services/${s.json.id}`, { method: 'DELETE' })).status, 200);
+  assert.equal((await admin('/api/admin/services/nao-existe', { method: 'DELETE' })).status, 404);
+});
+test('clientes: editar com WhatsApp repetido falha; excluir apaga agendamentos e derruba a sessão', async () => {
+  const a = await novoCliente(7), b = await novoCliente(8);
+  const lista = (await admin('/api/admin/clients')).json;
+  const ca = lista.find((x) => x.name === 'Cliente 7'), cb = lista.find((x) => x.name === 'Cliente 8');
+  assert.equal((await admin(`/api/admin/clients/${ca.id}`, { method: 'PUT', body: { name: 'Cliente 7', phone: cb.phone } })).status, 409);
+  const ag = (await a.c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: amanha, time: '11:00' } })).json;
+  assert.equal((await admin(`/api/admin/clients/${ca.id}`, { method: 'DELETE' })).status, 200);
+  assert.equal((await a.c('/api/appointments')).status, 401);
+  assert.ok((await b.c(`/api/slots?date=${amanha}`)).json.includes('11:00'), 'horário liberado');
+  assert.ok(ag.id);
+});
+test('configurações: nome e logo', async () => {
+  assert.equal((await admin('/api/admin/settings', { method: 'PUT', body: { studio: 'x' } })).status, 400);
+  assert.equal((await admin('/api/admin/settings', { method: 'PUT', body: { studio: 'Studio Teste' } })).status, 200);
+  assert.equal((await client()('/api/config')).json.studio, 'Studio Teste');
+  assert.equal((await admin('/api/admin/settings/logo', { method: 'POST', body: { dataUrl: 'data:image/png;base64,SGVsbG8gd29ybGQhISEhISEh' } })).status, 400, 'png falso');
+  assert.equal((await admin('/api/admin/settings/logo', { method: 'POST', body: { dataUrl: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' } })).status, 400, 'svg');
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64)]).toString('base64');
+  const up = await admin('/api/admin/settings/logo', { method: 'POST', body: { dataUrl: 'data:image/png;base64,' + png } });
+  assert.equal(up.status, 200); assert.ok(up.json.logo);
+  const lg = await fetch(BASE + '/logo'); assert.equal(lg.status, 200); assert.equal(lg.headers.get('content-type'), 'image/png');
+  assert.equal((await admin('/api/admin/settings/logo', { method: 'DELETE' })).status, 200);
+  assert.equal((await fetch(BASE + '/logo')).status, 404);
+});
+
+// ---------- Robustez e segurança ----------
+test('JSON malformado devolve erro em JSON (não HTML/stack)', async () => {
+  const r = await client()('/api/login', { method: 'POST', body: '{ nao eh json', raw: true, headers: { 'Content-Type': 'application/json' } });
+  assert.equal(r.status, 400);
+  assert.ok(r.json && r.json.erro, 'esperava {erro}, veio: ' + r.text.slice(0, 80));
+  assert.ok(!/at .*node_modules|SyntaxError/.test(r.text), 'não pode vazar stack trace');
+});
+test('requisição de outra origem (CSRF) é bloqueada', async () => {
+  const r = await client()('/api/login', { method: 'POST', body: { phone: '11988887777', password: '123456' }, headers: { Origin: 'https://site-malicioso.example' } });
+  assert.equal(r.status, 403);
+});
+test('endpoint de saúde informa a data no fuso do Brasil', async () => {
+  const r = await client()('/api/health');
+  assert.equal(r.status, 200);
+  const esperado = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  assert.equal(r.json.hoje, esperado);
+});
+test('servidor em modo produção recusa credenciais padrão', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-qa-prod-'));
+  const p = await startServer({ NODE_ENV: 'production', ADMIN_PASS: '', SESSION_SECRET: '' }, dir, PORT + 500);
+  await sleep(500);
+  const morreu = p.exitCode !== null && p.exitCode !== 0;
+  p.kill(); fs.rmSync(dir, { recursive: true, force: true });
+  assert.ok(morreu, 'deveria encerrar com erro ao faltar ADMIN_PASS/SESSION_SECRET. Log: ' + p.log.slice(0, 200));
+});
+test('dados persistem entre reinicializações', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-qa-persist-'));
+  const port = PORT + 600;
+  let p = await startServer({}, dir, port);
+  const hit = async (u, o) => { const r = await fetch(`http://127.0.0.1:${port}${u}`, o); return r.json(); };
+  await fetch(`http://127.0.0.1:${port}/api/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Persistente', phone: '11977776666', password: '123456' }) });
+  p.kill(); await sleep(400);
+  p = await startServer({}, dir, port);
+  const l = await fetch(`http://127.0.0.1:${port}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: '11977776666', password: '123456' }) });
+  p.kill(); fs.rmSync(dir, { recursive: true, force: true });
+  assert.equal(l.status, 200); void hit;
+});
+
+// ---------- Exclusão em massa de horários ----------
+test('agenda: excluir vários horários de uma vez (reservados são preservados)', async () => {
+  const dia = iso(addDays(8));
+  await admin('/api/admin/slots/bulk', { method: 'POST', body: { from: dia, to: dia, interval: 60, schedule: { [diaSemana(dia)]: [{ start: '09:00', end: '14:00' }] } } });
+  const lista = (await admin('/api/admin/slots')).json.filter((s) => s.date === dia);
+  assert.equal(lista.length, 6);
+  const { c } = await novoCliente(60);
+  assert.equal((await c('/api/appointments', { method: 'POST', body: { service: 'manicure', date: dia, time: '10:00' } })).status, 201);
+  assert.equal((await admin('/api/admin/slots/delete-many', { method: 'POST', body: { ids: [] } })).status, 400);
+  assert.equal((await admin('/api/admin/slots/delete-many', { method: 'POST', body: { ids: ['x'] } })).status, 400);
+  assert.equal((await client()('/api/admin/slots/delete-many', { method: 'POST', body: { ids: [1] } })).status, 401);
+  const r = await admin('/api/admin/slots/delete-many', { method: 'POST', body: { ids: lista.map((s) => s.id) } });
+  assert.equal(r.status, 200); assert.equal(r.json.removidos, 5); assert.equal(r.json.reservados, 1);
+  const depois = (await admin('/api/admin/slots')).json.filter((s) => s.date === dia);
+  assert.deepEqual(depois.map((s) => s.time), ['10:00']);
+  assert.equal(depois[0].ocupado, true);
+});

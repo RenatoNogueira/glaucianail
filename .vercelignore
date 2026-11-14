@@ -1,0 +1,6 @@
+data/
+tests/
+docs/
+.env
+.env.*
+node_modules/

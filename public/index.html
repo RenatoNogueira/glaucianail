@@ -1,0 +1,72 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#c2456f">
+<title>Agendamento – Manicure e Pé de Curi</title><link rel="stylesheet" href="style.css"></head><body>
+<header class="topbar"><div>
+  <div class="brand"><i data-brand-logo data-fallback="💅">💅</i><span id="studio" data-brand-name>Agendamento</span></div>
+  <div class="who"><span id="who"></span><button class="btn sec sm" id="logout" hidden>Sair</button></div>
+</div></header>
+<main>
+<section id="auth" class="landing hidden">
+  <div class="lp-hero">
+    <div class="lp-blob b1"></div><div class="lp-blob b2"></div>
+    <div class="lp-copy">
+      <span class="lp-badge">✨ Agendamento online</span>
+      <h1>Unhas e pés <em>cuidados</em>, sem complicação.</h1>
+      <p class="lp-sub">Escolha o serviço, o dia e o horário em poucos toques. Você recebe a confirmação direto no seu WhatsApp.</p>
+      <ul class="lp-perks">
+        <li><b>⚡</b> Agende em menos de 1 minuto</li>
+        <li><b>📲</b> Confirmação pelo WhatsApp</li>
+        <li><b>🗓️</b> Só horários realmente livres</li>
+      </ul>
+      <div class="lp-cta"><button type="button" class="btn lg" id="ctaStart">Agendar agora</button><button type="button" class="btn sec lg" id="ctaLogin">Já tenho conta</button></div>
+    </div>
+    <div class="card auth-card" id="authCard">
+      <h2 id="authTitle">Bem-vinda de volta</h2>
+      <div class="seg" role="tablist"><button class="on" id="tLogin" type="button">Entrar</button><button id="tReg" type="button">Criar conta</button></div>
+      <form id="fAuth" novalidate>
+        <div id="nameBox" class="hidden"><label for="name">Nome completo</label><input id="name" autocomplete="name"></div>
+        <label for="phone">WhatsApp (com DDD)</label><input id="phone" inputmode="tel" placeholder="(11) 91234-5678" autocomplete="tel">
+        <label for="pass">Senha</label>
+        <div class="pw"><input id="pass" type="password" autocomplete="current-password" placeholder="mínimo 6 caracteres"><button type="button" class="link" id="eye">Mostrar</button></div>
+        <div id="authMsg"></div>
+        <button class="btn block" id="authBtn" style="margin-top:14px">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="lp-sec" id="lpNextSec" hidden>
+    <div class="lp-head"><h2>Próximos horários livres</h2><p class="small">Toque em um para começar.</p></div>
+    <div class="qs-grid" id="lpNext"></div>
+  </section>
+
+  <section class="lp-sec">
+    <div class="lp-head"><h2>Nossos serviços</h2><p class="small">Tudo para cuidar das suas mãos e pés.</p></div>
+    <div class="lp-svcs" id="lpServices"></div>
+  </section>
+
+  <section class="lp-sec">
+    <div class="lp-head"><h2>Como funciona</h2></div>
+    <div class="lp-steps">
+      <div class="lp-step"><b>1</b><strong>Escolha</strong><span class="small">o serviço que você quer fazer.</span></div>
+      <div class="lp-step"><b>2</b><strong>Selecione</strong><span class="small">um dia e um horário disponível.</span></div>
+      <div class="lp-step"><b>3</b><strong>Receba</strong><span class="small">a aprovação no seu WhatsApp.</span></div>
+    </div>
+  </section>
+
+  <footer class="lp-foot"><span id="lpFoot"></span></footer>
+</section>
+
+<section id="app" class="hidden">
+  <nav class="nav"><button class="on" id="nBook">Agendar</button><button id="nList">Meus agendamentos<span class="badge hidden" id="badge"></span></button></nav>
+
+  <div id="vBook">
+    <div class="wiz-steps" id="wizSteps"></div>
+    <div id="wizBody" class="wiz"></div>
+  </div>
+
+  <div id="vOk" class="card success hidden"></div>
+  <div id="vList" class="card hidden"></div>
+</section>
+</main>
+<div class="sumbar hidden" id="sumbar"><div><div class="txt" id="sumTxt"></div><button class="btn" id="bookBtn" disabled>Continuar</button></div></div>
+<script src="ui.js"></script><script src="app.js"></script></body></html>
