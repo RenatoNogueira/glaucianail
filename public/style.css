@@ -476,5 +476,3 @@ img,video,svg{max-width:100%}
   .lp-cta .btn{padding-left:12px;padding-right:12px}
 }
 
-.app-install{margin-top:4px}.app-install .btn{width:100%}
-@media (min-width:600px){.app-install .btn{width:auto}}

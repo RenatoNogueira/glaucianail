@@ -83,7 +83,7 @@ O script **recusa** sobrescrever um banco que já tenha clientes ou agendamentos
 
 ## App instalável no celular (PWA)
 O site já é instalável (manifesto em `/manifest.webmanifest`, service worker `/sw.js`, ícones em `public/`). Requer HTTPS (a Vercel já fornece).
-- **Android (Chrome/Edge):** aparece o botão **📲 Instalar app** no topo do site; também no menu do navegador → *Instalar app*.
+- **Android (Chrome/Edge):** aparece o botão **📲 Instalar no celular** na página inicial (antes do login); também no menu do navegador → *Instalar app*.
 - **iPhone/iPad:** o botão mostra o passo a passo (Safari → Compartilhar → *Adicionar à Tela de Início*).
 - O **painel admin não é instalável** (acesso pelo navegador, em `/admin.html`).
 - O nome do app é o nome do estúdio (editável em Configurações). Para trocar os ícones: edite `scripts/gen-icons.js` e rode `npm run icons`.
