@@ -1,9 +1,9 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#c2456f">
+<meta name="theme-color" content="#c2456f"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Agendamento"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Agendamento – Manicure e Pé de Curi</title><link rel="stylesheet" href="style.css"></head><body>
 <header class="topbar"><div>
   <div class="brand"><i data-brand-logo data-fallback="💅">💅</i><span id="studio" data-brand-name>Agendamento</span></div>
-  <div class="who"><span id="who"></span><button class="btn sec sm" id="logout" hidden>Sair</button></div>
+  <div class="who"><span id="who"></span><button class="btn sec sm" data-install hidden>📲 Instalar app</button><button class="btn sec sm" id="logout" hidden>Sair</button></div>
 </div></header>
 <main>
 <section id="auth" class="landing hidden">
@@ -18,7 +18,7 @@
         <li><b>📲</b> <span data-t="vantagem2">Confirmação pelo WhatsApp</span></li>
         <li><b>🗓️</b> <span data-t="vantagem3">Só horários realmente livres</span></li>
       </ul>
-      <div class="lp-cta"><button type="button" class="btn lg" id="ctaStart" data-t="botaoPrincipal">Agendar agora</button><button type="button" class="btn sec lg" id="ctaLogin" data-t="botaoSecundario">Já tenho conta</button></div>
+      <div class="lp-cta"><button type="button" class="btn lg" id="ctaStart" data-t="botaoPrincipal">Agendar agora</button><button type="button" class="btn sec lg" id="ctaLogin" data-t="botaoSecundario">Já tenho conta</button><button type="button" class="btn sec lg" data-install hidden>📲 Instalar no celular</button></div>
     </div>
     <div class="card auth-card" id="authCard">
       <h2 id="authTitle">Bem-vinda de volta</h2>

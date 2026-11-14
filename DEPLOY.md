@@ -81,6 +81,14 @@ O script **recusa** sobrescrever um banco que já tenha clientes ou agendamentos
 - Mudanças futuras na estrutura dos dados passam por `lib/schema.js` → `npm run schema` → rodar o novo `schema.sql`.
 - Plano gratuito do Supabase **pausa o projeto após 1 semana sem uso**: o primeiro acesso depois disso falha até você reativá-lo no painel.
 
+## App instalável no celular (PWA)
+O site já é instalável (manifesto em `/manifest.webmanifest`, service worker `/sw.js`, ícones em `public/`). Requer HTTPS (a Vercel já fornece).
+- **Android (Chrome/Edge):** aparece o botão **📲 Instalar app** no topo do site; também no menu do navegador → *Instalar app*.
+- **iPhone/iPad:** o botão mostra o passo a passo (Safari → Compartilhar → *Adicionar à Tela de Início*).
+- **Painel admin:** instalável pelo botão *Instalar painel* (menu lateral) / *Instalar* (topo, no celular).
+- O nome do app é o nome do estúdio (editável em Configurações). Para trocar os ícones: edite `scripts/gen-icons.js` e rode `npm run icons`.
+- Os dados nunca ficam guardados no aparelho: sem internet o app mostra a página "Você está sem internet".
+
 ## Como funciona a segurança contra reservas duplicadas
 Cada alteração pega uma **trava** no banco (função `agenda_lock`, com validade de 10 s), lê os dados, aplica a mudança e grava tudo numa
 única transação (`agenda_apply`). Assim, duas pessoas tentando o mesmo horário ao mesmo tempo são atendidas uma de cada vez, e o índice
@@ -94,6 +102,6 @@ Ela tem prioridade sobre `SUPABASE_URL`. Nesse modo o sistema cria as tabelas so
 ```bash
 npm install
 npm start      # usa data/db.json (ou o Supabase, se SUPABASE_URL + SUPABASE_SECRET_KEY estiverem no .env)
-npm test       # 69 testes
+npm test       # 75 testes
 npm run schema # regenera supabase/schema.sql (após mudar lib/schema.js ou lib/rpc-sql.js)
 ```

@@ -381,3 +381,47 @@ test('página inicial: padrão público, edição pela admin, limites e restaura
   assert.equal((await admin('/api/admin/landing', { method: 'PUT', body: { valores: {} } })).status, 200);
   assert.equal((await pub('/api/config')).json.textos.botaoPrincipal, 'Agendar agora', 'restaurado');
 });
+
+// ---------- App instalável (PWA) ----------
+test('PWA: manifesto do site usa o nome atual do estúdio e lista os ícones', async () => {
+  const pub = client();
+  assert.equal((await admin('/api/admin/settings', { method: 'PUT', body: { studio: 'Glaucia Nail Design' } })).status, 200);
+  const r = await fetch(BASE + '/manifest.webmanifest');
+  assert.equal(r.status, 200); assert.match(r.headers.get('content-type'), /application\/manifest\+json/);
+  const m = await r.json();
+  assert.equal(m.name, 'Glaucia Nail Design'); assert.ok(m.short_name.length <= 12); assert.equal(m.display, 'standalone');
+  assert.equal(m.start_url, '/'); assert.equal(m.scope, '/'); assert.equal(m.lang, 'pt-BR');
+  const sizes = m.icons.map((i) => `${i.sizes}:${i.purpose}`);
+  assert.ok(sizes.includes('192x192:any') && sizes.includes('512x512:any') && sizes.includes('512x512:maskable'), sizes.join(','));
+  for (const i of m.icons) assert.equal((await fetch(BASE + i.src)).status, 200, i.src);
+  void pub;
+});
+test('PWA: manifesto do painel admin é separado (outro id e escopo)', async () => {
+  const m = await (await fetch(BASE + '/manifest-admin.webmanifest')).json();
+  assert.equal(m.start_url, '/admin.html'); assert.equal(m.id, '/admin.html'); assert.equal(m.scope, '/admin'); assert.match(m.name, /Painel/);
+  assert.ok(m.start_url.startsWith(m.scope), 'start_url precisa estar dentro do escopo');
+});
+test('PWA: ícones são PNG válidos com o tamanho declarado', async () => {
+  for (const [arq, lado] of [['icon-192.png', 192], ['icon-512.png', 512], ['icon-maskable-512.png', 512], ['apple-touch-icon.png', 180]]) {
+    const b = Buffer.from(await (await fetch(BASE + '/' + arq)).arrayBuffer());
+    assert.deepEqual([...b.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], arq + ' não é PNG');
+    assert.equal(b.readUInt32BE(16), lado, arq + ' largura'); assert.equal(b.readUInt32BE(20), lado, arq + ' altura');
+  }
+});
+test('PWA: service worker e página offline existem; o service worker não guarda dados da API', async () => {
+  const sw = await fetch(BASE + '/sw.js'); assert.equal(sw.status, 200); assert.match(sw.headers.get('content-type'), /javascript/);
+  const codigo = await sw.text();
+  assert.match(codigo, /addEventListener\('fetch'/); assert.match(codigo, /startsWith\('\/api\/'\)/); assert.match(codigo, /startsWith\('\/admin'\)/);
+  assert.equal((await fetch(BASE + '/offline.html')).status, 200);
+});
+test('PWA: páginas apontam para o manifesto e para os ícones', async () => {
+  const site = await (await fetch(BASE + '/')).text(), painel = await (await fetch(BASE + '/admin.html')).text();
+  assert.match(site, /rel="manifest" href="\/manifest\.webmanifest"/); assert.match(site, /apple-touch-icon/); assert.match(site, /data-install/);
+  assert.match(painel, /rel="manifest" href="\/manifest-admin\.webmanifest"/); assert.match(painel, /data-install/);
+});
+test('PWA: vercel.json encaminha os manifestos para a função', () => {
+  const v = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
+  const fontes = v.rewrites.map((r) => r.source);
+  assert.ok(fontes.includes('/manifest.webmanifest') && fontes.includes('/manifest-admin.webmanifest'));
+  assert.ok(v.headers.some((h) => h.source === '/sw.js'));
+});

@@ -88,8 +88,31 @@ function applyBrand(c) {
     e.classList.toggle('has-logo', !!c.logo);
   });
   let ic = document.querySelector('link[rel=icon]');
-  if (c.logo) { if (!ic) { ic = document.createElement('link'); ic.rel = 'icon'; document.head.append(ic); } ic.href = c.logo; } else if (ic) ic.remove();
+  if (c.logo) { if (!ic) { ic = document.createElement('link'); ic.rel = 'icon'; document.head.append(ic); } ic.href = c.logo; } else if (ic) ic.href = '/icon-192.png'; // sem logo: volta ao ícone padrão
 }
+
+// ---------- Instalar como app (PWA) ----------
+// Elementos com [data-install] aparecem quando o navegador permite instalar (Android/Chrome/Edge) ou no iPhone/iPad (instruções).
+(function () {
+  const instalado = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let evento = null;
+  const atualizar = () => { const mostrar = !instalado() && (!!evento || ios); document.querySelectorAll('[data-install]').forEach((b) => (b.hidden = !mostrar)); };
+
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); evento = e; atualizar(); });
+  window.addEventListener('appinstalled', () => { evento = null; atualizar(); toast('App instalado! Procure o ícone na sua tela inicial ✓', 'ok'); });
+  document.addEventListener('click', async (e) => {
+    if (!e.target.closest('[data-install]')) return;
+    if (evento) { evento.prompt(); await evento.userChoice.catch(() => {}); evento = null; atualizar(); return; }
+    if (ios) modal({
+      title: 'Instalar no iPhone / iPad',
+      html: '<ol class="small" style="padding-left:20px;line-height:1.9;margin:0"><li>Toque no botão <strong>Compartilhar</strong> (o quadrado com a seta ⬆︎).</li><li>Role e escolha <strong>Adicionar à Tela de Início</strong>.</li><li>Toque em <strong>Adicionar</strong>. Pronto: o ícone aparece na sua tela.</li></ol><p class="small" style="margin-top:12px">Dica: no iPhone, use o <strong>Safari</strong> para instalar.</p>',
+      actions: [{ label: 'Entendi' }],
+    });
+  });
+  atualizar();
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+})();
 
 // ---------- Calendário ----------
 // Calendar(el, { mode:'single'|'range', enabled(iso), marks(iso)->n, allowPast, onChange(value) })

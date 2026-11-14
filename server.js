@@ -511,6 +511,35 @@ app.put('/api/admin/landing', needAdmin, wrap(async (req, res) => {
   res.json({ valores: r.valores, textos: landing.mesclar(r.valores) });
 }));
 
+// ----- App instalável (PWA): manifestos com o nome atual do estúdio -----
+function manifestoDo(admin) {
+  const nome = getStudio();
+  return {
+    id: admin ? '/admin.html' : '/',
+    name: admin ? `${nome} — Painel` : nome,
+    short_name: admin ? 'Painel' : nome.slice(0, 12),
+    description: admin ? 'Painel da administradora: pedidos, agenda, serviços e clientes.' : 'Agende manicure e pé de curi e receba a confirmação no WhatsApp.',
+    start_url: admin ? '/admin.html' : '/',
+    scope: admin ? '/admin' : '/',
+    display: 'standalone',
+    orientation: 'portrait',
+    lang: 'pt-BR',
+    background_color: admin ? '#17101a' : '#fbf6f4',
+    theme_color: admin ? '#2d1f2b' : '#c2456f',
+    categories: ['lifestyle', 'beauty'],
+    icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  };
+}
+for (const [rota, admin] of [['/manifest.webmanifest', false], ['/manifest-admin.webmanifest', true]]) {
+  app.get(rota, store.middleware, (req, res) => {
+    res.set({ 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=300' }).send(JSON.stringify(manifestoDo(admin)));
+  });
+}
+
 // ----- Backup manual (download do banco completo) -----
 app.get('/api/admin/backup', needAdmin, (req, res) => {
   const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
