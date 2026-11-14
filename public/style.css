@@ -238,7 +238,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--rose);bo
 .or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.8rem;margin:20px 0 12px}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .strip-row{display:flex;gap:10px;align-items:center}
-.strip{flex:1;min-width:0;display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;scrollbar-width:thin;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.strip{flex:1;min-width:0;display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent)}
 .dp{flex:0 0 58px;scroll-snap-align:start;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:8px 0;text-align:center;transition:.15s}
 .dp:hover{border-color:var(--rose)}
 .dp small{display:block;text-transform:uppercase;font-size:.66rem;color:var(--muted);letter-spacing:.05em}
@@ -425,7 +425,7 @@ code{background:var(--gray-bg);padding:1px 6px;border-radius:6px;font-size:.85em
 @media (max-width:899px){.tabbar{grid-template-columns:repeat(7,1fr)}.tb-item{font-size:.58rem}.tb-item .ni{padding:2px 8px;font-size:1.2rem}}
 
 /* Menu lateral: nunca corta itens em telas baixas (rola e fica compacto) */
-.side{height:100vh;height:100dvh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.side{height:100vh;height:100dvh;overflow-y:auto;overscroll-behavior:contain}
 .side-foot{flex:0 0 auto}
 @media (min-width:900px) and (max-height:820px){
   .side{padding:14px 12px;gap:4px}
@@ -438,4 +438,26 @@ code{background:var(--gray-bg);padding:1px 6px;border-radius:6px;font-size:.85em
 @media (min-width:900px) and (max-height:620px){
   .sn-item{padding:6px 12px;font-size:.88rem}
   .sn-item .ni{font-size:1rem}
+}
+
+/* ---------- Página sem rolagem horizontal ---------- */
+/* Enfeites decorativos (manchas desfocadas do topo) e faixas largas nunca criam barra horizontal na página */
+body{overflow-x:hidden}
+img,video,svg{max-width:100%}
+
+/* ---------- Barras de rolagem personalizadas ---------- */
+:root{--sb-size:10px;--sb-thumb:color-mix(in srgb,var(--rose) 45%,transparent);--sb-thumb-hover:var(--rose)}
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar{width:var(--sb-size);height:var(--sb-size)}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:999px;border:2px solid transparent;background-clip:padding-box;min-height:36px;min-width:36px}
+::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-hover);background-clip:padding-box}
+::-webkit-scrollbar-thumb:active{background:var(--rose-d);background-clip:padding-box}
+::-webkit-scrollbar-corner{background:transparent}
+/* Barras finas dentro de menus/listas e faixas horizontais */
+.side::-webkit-scrollbar,.iconlib::-webkit-scrollbar,.modal::-webkit-scrollbar,.strip::-webkit-scrollbar,.days::-webkit-scrollbar{width:6px;height:6px}
+.strip::-webkit-scrollbar-thumb,.days::-webkit-scrollbar-thumb{border-width:1px}
+/* Firefox (não entende ::-webkit-scrollbar) */
+@supports not selector(::-webkit-scrollbar){
+  *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--rose) 55%,transparent) transparent}
 }
