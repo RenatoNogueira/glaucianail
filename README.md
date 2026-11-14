@@ -33,7 +33,7 @@ Veja [DEPLOY.md](DEPLOY.md). Estrutura do banco em [supabase/schema.sql](supabas
 server.js            API Express (exporta o app)
 api/index.js         ponto de entrada serverless da Vercel
 lib/                 armazenamento (arquivo/Postgres), sessões, esquema do banco
-public/              site (cliente e painel admin)
+public/              site (cliente: index.html + site.js · painel: admin.html + admin.js)
 scripts/             importação de dados locais para o Postgres, gerador do schema.sql
 supabase/schema.sql  estrutura do banco para o SQL Editor do Supabase
 tests/               testes da API e do adaptador PostgreSQL

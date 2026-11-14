@@ -56,7 +56,9 @@ npm i -g vercel
 vercel          # preview
 vercel --prod   # produção
 ```
-Ou conecte o repositório no painel (Framework: **Other**, sem build command; o `vercel.json` já define `public` como saída).
+Ou conecte o repositório no painel. **Framework Preset: Other** (o `vercel.json` já força `"framework": null`), sem Build Command, Output Directory `public`.
+
+> Se o build falhar com *"No entrypoint found which imports express"*: é a detecção automática de Express da Vercel. Confirme em *Settings → Build & Development* que o preset é **Other** (não "Express"). O backend é a função `api/index.js`, que carrega `server.js`.
 
 ## 4. Smoke test (faça após o primeiro deploy)
 1. `https://SEU-DOMINIO/api/health` → deve mostrar `"armazenamento":"postgres"` e a data de hoje no fuso do Brasil.
