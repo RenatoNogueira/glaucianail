@@ -3,7 +3,7 @@
 <title>Agendamento – Manicure e Pé de Curi</title><link rel="stylesheet" href="style.css"></head><body>
 <header class="topbar"><div>
   <div class="brand"><i data-brand-logo data-fallback="💅">💅</i><span id="studio" data-brand-name>Agendamento</span></div>
-  <div class="who"><span id="who"></span><button class="btn sec sm" data-install hidden>📲 Instalar app</button><button class="btn sec sm" id="logout" hidden>Sair</button></div>
+  <div class="who"><span id="who"></span><button class="btn sec sm inst" data-install hidden aria-label="Instalar app"><span class="inst-ic">📲</span><span class="inst-lbl">Instalar app</span></button><button class="btn sec sm" id="logout" hidden>Sair</button></div>
 </div></header>
 <main>
 <section id="auth" class="landing hidden">
@@ -18,7 +18,8 @@
         <li><b>📲</b> <span data-t="vantagem2">Confirmação pelo WhatsApp</span></li>
         <li><b>🗓️</b> <span data-t="vantagem3">Só horários realmente livres</span></li>
       </ul>
-      <div class="lp-cta"><button type="button" class="btn lg" id="ctaStart" data-t="botaoPrincipal">Agendar agora</button><button type="button" class="btn sec lg" id="ctaLogin" data-t="botaoSecundario">Já tenho conta</button><button type="button" class="btn sec lg" data-install hidden>📲 Instalar no celular</button></div>
+      <div class="lp-cta"><button type="button" class="btn lg" id="ctaStart" data-t="botaoPrincipal">Agendar agora</button><button type="button" class="btn sec lg" id="ctaLogin" data-t="botaoSecundario">Já tenho conta</button></div>
+      <div class="lp-install"><button type="button" class="btn sec" data-install hidden>📲 Instalar no celular</button></div>
     </div>
     <div class="card auth-card" id="authCard">
       <h2 id="authTitle">Bem-vinda de volta</h2>

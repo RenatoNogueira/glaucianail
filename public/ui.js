@@ -92,23 +92,40 @@ function applyBrand(c) {
 }
 
 // ---------- Instalar como app (PWA) ----------
-// Elementos com [data-install] aparecem quando o navegador permite instalar (Android/Chrome/Edge) ou no iPhone/iPad (instruções).
+// Elementos com [data-install] aparecem no celular (e no computador quando o navegador oferece a instalação).
+// Android/Chrome/Edge: abre a janela de instalação. iPhone/iPad e casos sem janela automática: passo a passo.
 (function () {
+  const ua = navigator.userAgent;
   const instalado = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const android = /android/i.test(ua);
+  // Navegadores embutidos (WhatsApp, Instagram, Facebook...) não conseguem instalar: é preciso abrir no Chrome/Safari
+  const emApp = /; wv\)|FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat|TikTok/i.test(ua);
   let evento = null;
-  const atualizar = () => { const mostrar = !instalado() && (!!evento || ios); document.querySelectorAll('[data-install]').forEach((b) => (b.hidden = !mostrar)); };
+  const atualizar = () => { const mostrar = !instalado() && (!!evento || ios || android); document.querySelectorAll('[data-install]').forEach((b) => (b.hidden = !mostrar)); };
 
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); evento = e; atualizar(); });
-  window.addEventListener('appinstalled', () => { evento = null; atualizar(); toast('App instalado! Procure o ícone na sua tela inicial ✓', 'ok'); });
+  window.addEventListener('appinstalled', () => { evento = null; atualizar(); toast('App instalado! Procure o ícone na tela inicial ✓', 'ok'); });
+
+  const ajuda = (titulo, passos, nota) => modal({
+    title: titulo,
+    html: `<ol class="small" style="padding-left:20px;line-height:1.9;margin:0">${passos.map((p) => `<li>${p}</li>`).join('')}</ol>${nota ? `<p class="small" style="margin-top:12px">${nota}</p>` : ''}`,
+    actions: [{ label: 'Entendi' }],
+  });
+
   document.addEventListener('click', async (e) => {
     if (!e.target.closest('[data-install]')) return;
-    if (evento) { evento.prompt(); await evento.userChoice.catch(() => {}); evento = null; atualizar(); return; }
-    if (ios) modal({
-      title: 'Instalar no iPhone / iPad',
-      html: '<ol class="small" style="padding-left:20px;line-height:1.9;margin:0"><li>Toque no botão <strong>Compartilhar</strong> (o quadrado com a seta ⬆︎).</li><li>Role e escolha <strong>Adicionar à Tela de Início</strong>.</li><li>Toque em <strong>Adicionar</strong>. Pronto: o ícone aparece na sua tela.</li></ol><p class="small" style="margin-top:12px">Dica: no iPhone, use o <strong>Safari</strong> para instalar.</p>',
-      actions: [{ label: 'Entendi' }],
-    });
+    if (emApp) return ajuda('Abra no navegador', ['Toque nos <strong>três pontinhos ⋮</strong> (ou no ícone de compartilhar) aqui no canto.', 'Escolha <strong>Abrir no Chrome</strong> (ou <strong>Abrir no Safari</strong>).', 'Depois toque em <strong>Instalar</strong> de novo.'], 'Dentro do WhatsApp/Instagram não é possível instalar o app.');
+    if (evento) {
+      evento.prompt();
+      const r = await evento.userChoice.catch(() => ({}));
+      evento = null; atualizar();
+      if (r.outcome === 'dismissed') toast('Sem problemas! Você pode instalar depois pelo menu do navegador (⋮ → Instalar app).');
+      else if (r.outcome === 'accepted') toast('Instalando… o ícone aparece na tela inicial em instantes ✓', 'ok');
+      return;
+    }
+    if (ios) return ajuda('Instalar no iPhone / iPad', ['Toque no botão <strong>Compartilhar</strong> (o quadrado com a seta ⬆︎).', 'Role e escolha <strong>Adicionar à Tela de Início</strong>.', 'Toque em <strong>Adicionar</strong>. O ícone aparece na sua tela.'], 'No iPhone é preciso usar o <strong>Safari</strong>.');
+    ajuda('Instalar no Android', ['Toque nos <strong>três pontinhos ⋮</strong> do Chrome (canto superior direito).', 'Escolha <strong>Instalar app</strong> (ou <strong>Adicionar à tela inicial</strong>).', 'Confirme em <strong>Instalar</strong>. O ícone aparece na tela inicial.'], 'Não apareceu o ícone? Em <em>Configurações do celular → Apps → Chrome → Permissões</em>, ative <strong>Criar atalhos na tela inicial</strong> (alguns aparelhos pedem isso).');
   });
   atualizar();
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
