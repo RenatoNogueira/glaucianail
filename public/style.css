@@ -15,7 +15,7 @@ button{font:inherit;cursor:pointer}
 .small{font-size:.85rem;color:var(--muted)}
 
 /* Topbar */
-.topbar{background:var(--bar);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);position:sticky;position:-webkit-sticky;top:0;z-index:30}
 .topbar>div{max-width:880px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:600}
 .brand i{font-style:normal;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--blush)}
@@ -442,7 +442,8 @@ code{background:var(--gray-bg);padding:1px 6px;border-radius:6px;font-size:.85em
 
 /* ---------- Página sem rolagem horizontal ---------- */
 /* Enfeites decorativos (manchas desfocadas do topo) e faixas largas nunca criam barra horizontal na página */
-body{overflow-x:hidden}
+html{overflow-x:clip}
+@supports not (overflow:clip){body{overflow-x:hidden}}
 img,video,svg{max-width:100%}
 
 /* ---------- Barras de rolagem personalizadas ---------- */
@@ -474,3 +475,6 @@ img,video,svg{max-width:100%}
   .lp-install .btn{width:100%}
   .lp-cta .btn{padding-left:12px;padding-right:12px}
 }
+
+.app-install{margin-top:4px}.app-install .btn{width:100%}
+@media (min-width:600px){.app-install .btn{width:auto}}
