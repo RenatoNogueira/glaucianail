@@ -16,10 +16,6 @@
       "destination": "/api"
     },
     {
-      "source": "/manifest-admin.webmanifest",
-      "destination": "/api"
-    },
-    {
       "source": "/admin",
       "destination": "/admin.html"
     }

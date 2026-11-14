@@ -85,7 +85,7 @@ O script **recusa** sobrescrever um banco que já tenha clientes ou agendamentos
 O site já é instalável (manifesto em `/manifest.webmanifest`, service worker `/sw.js`, ícones em `public/`). Requer HTTPS (a Vercel já fornece).
 - **Android (Chrome/Edge):** aparece o botão **📲 Instalar app** no topo do site; também no menu do navegador → *Instalar app*.
 - **iPhone/iPad:** o botão mostra o passo a passo (Safari → Compartilhar → *Adicionar à Tela de Início*).
-- **Painel admin:** instalável pelo botão *Instalar painel* (menu lateral) / *Instalar* (topo, no celular).
+- O **painel admin não é instalável** (acesso pelo navegador, em `/admin.html`).
 - O nome do app é o nome do estúdio (editável em Configurações). Para trocar os ícones: edite `scripts/gen-icons.js` e rode `npm run icons`.
 - Os dados nunca ficam guardados no aparelho: sem internet o app mostra a página "Você está sem internet".
 

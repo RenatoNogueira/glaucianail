@@ -396,10 +396,10 @@ test('PWA: manifesto do site usa o nome atual do estúdio e lista os ícones', a
   for (const i of m.icons) assert.equal((await fetch(BASE + i.src)).status, 200, i.src);
   void pub;
 });
-test('PWA: manifesto do painel admin é separado (outro id e escopo)', async () => {
-  const m = await (await fetch(BASE + '/manifest-admin.webmanifest')).json();
-  assert.equal(m.start_url, '/admin.html'); assert.equal(m.id, '/admin.html'); assert.equal(m.scope, '/admin'); assert.match(m.name, /Painel/);
-  assert.ok(m.start_url.startsWith(m.scope), 'start_url precisa estar dentro do escopo');
+test('PWA: o painel admin NÃO é instalável (sem manifesto e sem botão)', async () => {
+  assert.equal((await fetch(BASE + '/manifest-admin.webmanifest')).status, 404);
+  const painel = await (await fetch(BASE + '/admin.html')).text();
+  assert.ok(!/manifest|data-install/.test(painel), 'admin.html não pode oferecer instalação');
 });
 test('PWA: ícones são PNG válidos com o tamanho declarado', async () => {
   for (const [arq, lado] of [['icon-192.png', 192], ['icon-512.png', 512], ['icon-maskable-512.png', 512], ['apple-touch-icon.png', 180]]) {
@@ -414,14 +414,13 @@ test('PWA: service worker e página offline existem; o service worker não guard
   assert.match(codigo, /addEventListener\('fetch'/); assert.match(codigo, /startsWith\('\/api\/'\)/); assert.match(codigo, /startsWith\('\/admin'\)/);
   assert.equal((await fetch(BASE + '/offline.html')).status, 200);
 });
-test('PWA: páginas apontam para o manifesto e para os ícones', async () => {
-  const site = await (await fetch(BASE + '/')).text(), painel = await (await fetch(BASE + '/admin.html')).text();
+test('PWA: o site aponta para o manifesto e para os ícones', async () => {
+  const site = await (await fetch(BASE + '/')).text();
   assert.match(site, /rel="manifest" href="\/manifest\.webmanifest"/); assert.match(site, /apple-touch-icon/); assert.match(site, /data-install/);
-  assert.match(painel, /rel="manifest" href="\/manifest-admin\.webmanifest"/); assert.match(painel, /data-install/);
 });
-test('PWA: vercel.json encaminha os manifestos para a função', () => {
+test('PWA: vercel.json encaminha o manifesto para a função', () => {
   const v = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
   const fontes = v.rewrites.map((r) => r.source);
-  assert.ok(fontes.includes('/manifest.webmanifest') && fontes.includes('/manifest-admin.webmanifest'));
+  assert.ok(fontes.includes('/manifest.webmanifest') && !fontes.includes('/manifest-admin.webmanifest'));
   assert.ok(v.headers.some((h) => h.source === '/sw.js'));
 });

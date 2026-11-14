@@ -10,7 +10,7 @@ aprova ou recusa no painel e a resposta segue para o **WhatsApp** da cliente.
 - **Cliente:** cadastro/login por WhatsApp, agendamento em 3 passos (serviço → data e hora → confirmação), histórico e cancelamento.
 - **Administradora:** visão geral, aprovação/recusa com mensagem de WhatsApp, agenda de horários (publicação em lote e exclusão em massa),
   CRUD de serviços (com biblioteca de ícones), clientes, nome e logo do estúdio, **edição dos textos da página inicial**, backup.
-- **App instalável (PWA):** as clientes instalam o site na tela inicial do celular (botão "Instalar"); o painel admin também pode ser instalado.
+- **App instalável (PWA):** as clientes instalam o site na tela inicial do celular (botão "Instalar"). O painel admin continua só no navegador.
 - Modo claro/escuro, layout responsivo (menu lateral no computador, barra de abas no celular).
 
 ## Rodando localmente
