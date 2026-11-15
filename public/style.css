@@ -634,3 +634,8 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
   .landing .lp-svcs .lp-svc:hover{transform:none}
 }
 @media (max-width:640px) and (prefers-reduced-motion:reduce){.landing .lp-svcs .lp-svc{filter:none;scale:1;opacity:1}}
+
+@media (max-width:640px){
+  .landing .lp-svcs .lp-svc.sel{border-color:var(--rose);box-shadow:0 0 0 3px rgba(194,69,111,.28),0 14px 34px rgba(194,69,111,.25),var(--glass-sh)}
+  .landing .lp-svcs .lp-svc{cursor:pointer;-webkit-tap-highlight-color:transparent}
+}

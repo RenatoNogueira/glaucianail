@@ -108,16 +108,29 @@ function svcCarousel() {
   };
   const pedir = () => { if (!raf) raf = requestAnimationFrame(efeito); };
   const centrar = (i) => { const c = list.children[i]; if (c) list.scrollTo({ left: c.offsetLeft - (list.clientWidth - c.offsetWidth) / 2, behavior: 'smooth' }); };
-  const indice = () => [...dots.children].findIndex((b) => b.classList.contains('on'));
+  const indice = () => { // card mais próximo do centro (não depende do efeito visual)
+    const centro = list.scrollLeft + list.clientWidth / 2; let m = 0, dm = 1e9;
+    [...list.children].forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - centro); if (d < dm) { dm = d; m = i; } });
+    return m;
+  };
   list.addEventListener('scroll', pedir, { passive: true });
   addEventListener('resize', pedir);
   dots.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) centrar(+b.dataset.i); };
+  // Tocar em um serviço o seleciona e PAUSA o carrossel; tocar de novo (ou fora da lista) solta
+  let sel = null;
+  const soltar = () => { if (sel) sel.classList.remove('sel'); sel = null; };
+  list.addEventListener('click', (e) => {
+    const c = e.target.closest('.lp-svc'); if (!c || !ativo()) return;
+    if (sel === c) return soltar();
+    soltar(); sel = c; c.classList.add('sel'); centrar([...list.children].indexOf(c));
+  });
+  document.addEventListener('click', (e) => { if (sel && !e.target.closest('#lpServices')) soltar(); });
   let pausa = false;
   list.addEventListener('touchstart', () => (pausa = true), { passive: true });
   list.addEventListener('touchend', () => setTimeout(() => (pausa = false), 4000), { passive: true });
   const reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduz) svcTimer = setInterval(() => {
-    if (pausa || document.hidden || !ativo()) return;
+    if (pausa || sel || document.hidden || !ativo()) return;
     const n = list.children.length, i = indice();
     centrar(i >= n - 1 ? 0 : i + 1);
   }, 4000);
