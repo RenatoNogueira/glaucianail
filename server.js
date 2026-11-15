@@ -512,21 +512,28 @@ app.delete('/api/admin/settings/logo', needAdmin, wrap(async (req, res) => {
 
 // ----- Textos da página inicial (editáveis pela admin) -----
 // ----- Avaliações (estrelas) da página inicial -----
-// Ficam em settings.reviews (já persistido nos três modos de armazenamento). Qualquer visitante avalia; o painel admin pode excluir.
+// Ficam em settings.reviews (já persistido nos três modos de armazenamento). Qualquer visitante avalia; o painel admin modera.
+// settings.reviewsCfg: { exibir (mostra a seção no site), aberto (aceita novas avaliações) } — ambos ligados por padrão.
 const MAX_REVIEWS = 500;
+const rvCfg = () => ({ exibir: true, aberto: true, ...(db.settings.reviewsCfg || {}) });
+const rvVisiveis = () => (db.settings.reviews || []).filter((r) => !r.oculto);
 function reviewStats() {
-  const l = db.settings.reviews || [], dist = [0, 0, 0, 0, 0];
+  const l = rvVisiveis(), dist = [0, 0, 0, 0, 0];
   l.forEach((r) => dist[r.estrelas - 1]++);
   return { total: l.length, media: l.length ? Math.round((l.reduce((s, r) => s + r.estrelas, 0) / l.length) * 10) / 10 : 0, dist };
 }
 app.get('/api/reviews', (req, res) => {
-  const itens = (db.settings.reviews || []).filter((r) => r.texto).slice(-6).reverse().map((r) => ({ nome: r.nome, estrelas: r.estrelas, texto: r.texto, data: r.data }));
-  res.json({ ...reviewStats(), itens });
+  const cfg = rvCfg();
+  if (!cfg.exibir) return res.json({ exibir: false });
+  const itens = rvVisiveis().filter((r) => r.texto).slice(-6).reverse().map((r) => ({ nome: r.nome, estrelas: r.estrelas, texto: r.texto, data: r.data }));
+  res.json({ exibir: true, aberto: cfg.aberto, ...reviewStats(), itens });
 });
 app.post('/api/reviews', wrap(async (req, res) => {
+  const cfg = rvCfg();
+  if (!cfg.exibir || !cfg.aberto) return res.status(403).json({ erro: 'As avaliações estão fechadas no momento.' });
   const b = req.body || {}, key = `r:${req.ip}`;
   if (limiter.blocked(key, 3)) return res.status(429).json({ erro: 'Você já enviou avaliações recentemente. Tente novamente mais tarde.' });
-  const estrelas = +b.estrelas, nome = String(b.nome || '').trim().replace(/\s+/g, ' ').slice(0, 40), texto = String(b.texto || '').trim().slice(0, 300);
+  const estrelas = +b.estrelas, nome = String(b.nome || '').trim().replace(/s+/g, ' ').slice(0, 40), texto = String(b.texto || '').trim().slice(0, 300);
   if (!Number.isInteger(estrelas) || estrelas < 1 || estrelas > 5) return res.status(400).json({ erro: 'Escolha de 1 a 5 estrelas.' });
   if (nome.length < 2) return res.status(400).json({ erro: 'Informe seu nome.' });
   const l = db.settings.reviews = db.settings.reviews || [];
@@ -536,7 +543,22 @@ app.post('/api/reviews', wrap(async (req, res) => {
   limiter.fail(key, 60 * 60e3);
   res.status(201).json({ ok: true, ...reviewStats() });
 }));
-app.get('/api/admin/reviews', needAdmin, (req, res) => res.json({ ...reviewStats(), itens: [...(db.settings.reviews || [])].reverse() }));
+app.get('/api/admin/reviews', needAdmin, (req, res) => res.json({ ...reviewStats(), cfg: rvCfg(), ocultas: (db.settings.reviews || []).filter((r) => r.oculto).length, itens: [...(db.settings.reviews || [])].reverse() }));
+app.patch('/api/admin/reviews/:id', needAdmin, wrap(async (req, res) => {
+  const r = (db.settings.reviews || []).find((x) => x.id === +req.params.id);
+  if (!r) return res.status(404).json({ erro: 'Avaliação não encontrada.' });
+  if (typeof (req.body || {}).oculto !== 'boolean') return res.status(400).json({ erro: 'Pedido inválido.' });
+  if (req.body.oculto) r.oculto = true; else delete r.oculto;
+  await save();
+  res.json({ ok: true, ...reviewStats() });
+}));
+app.put('/api/admin/reviews-config', needAdmin, wrap(async (req, res) => {
+  const b = req.body || {};
+  if (typeof b.exibir !== 'boolean' || typeof b.aberto !== 'boolean') return res.status(400).json({ erro: 'Pedido inválido.' });
+  db.settings.reviewsCfg = { exibir: b.exibir, aberto: b.aberto };
+  await save();
+  res.json(rvCfg());
+}));
 app.delete('/api/admin/reviews/:id', needAdmin, wrap(async (req, res) => {
   const l = db.settings.reviews || [], i = l.findIndex((r) => r.id === +req.params.id);
   if (i < 0) return res.status(404).json({ erro: 'Avaliação não encontrada.' });

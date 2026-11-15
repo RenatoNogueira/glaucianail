@@ -93,6 +93,8 @@ $('rvPick').onclick = (e) => { const b = e.target.closest('button[data-n]'); if 
 async function loadReviews() {
   try {
     const r = await api('/api/reviews');
+    $('lpRev').hidden = r.exibir === false; if (r.exibir === false) return;
+    $('rvForm').hidden = r.aberto === false;
     $('rvAvg').textContent = r.total ? String(r.media).replace('.', ',') : '—';
     $('rvAvgStars').innerHTML = starsHtml(r.media);
     $('rvCount').textContent = r.total ? `${r.total} ${r.total === 1 ? 'avaliação' : 'avaliações'}` : 'Seja a primeira a avaliar!';

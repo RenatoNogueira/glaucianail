@@ -27,6 +27,7 @@ const NAV = [
   ['agenda', '🗓️', 'Agenda', 'Defina os dias e horários de atendimento', 'Agenda'],
   ['serv', '💅', 'Serviços', 'Cadastre serviços, preços e duração', 'Serviços'],
   ['cli', '👥', 'Clientes', 'Gerencie suas clientes', 'Clientes'],
+  ['rev', '⭐', 'Avaliações', 'Veja, oculte ou exclua o que as clientes avaliaram', 'Avaliações'],
   ['landing', '🖼️', 'Página inicial', 'Edite os textos que as clientes veem ao abrir o site', 'Site'],
   ['cfg', '⚙️', 'Configurações', 'Nome, logo e cópia de segurança', 'Ajustes'],
 ];
@@ -39,7 +40,7 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-v],[data-go]');
   if (b) view(b.dataset.v || b.dataset.go);
 });
-const loaders = { home: () => loadHome(), req: () => load(), agenda: () => loadSlots(), serv: () => loadServices(), cli: () => loadClients(), landing: () => loadLanding(), cfg: () => loadCfg() };
+const loaders = { home: () => loadHome(), req: () => load(), agenda: () => loadSlots(), serv: () => loadServices(), cli: () => loadClients(), rev: () => loadReviewsAdmin(), landing: () => loadLanding(), cfg: () => loadCfg() };
 function view(v) {
   cur = v; const n = NAV.find((x) => x[0] === v);
   NAV.forEach(([k]) => $('v-' + k).classList.toggle('hidden', k !== v));
@@ -603,23 +604,46 @@ async function loadLanding() {
   const r = await api('/api/admin/landing');
   LD.campos = r.campos; LD.grupos = r.grupos; LD.valores = { ...r.valores }; LD.salvo = { ...r.valores };
   renderLanding();
-  loadReviewsAdmin();
 }
 
-// Avaliações recebidas (estrelas): ver e excluir
+// ---------- Avaliações (estrelas): moderar ----------
+const RV = { data: null, f: 'all' };
+const rvStars = (n) => '★'.repeat(n) + '<span style="opacity:.3">' + '★'.repeat(5 - n) + '</span>';
 async function loadReviewsAdmin() {
-  const r = await api('/api/admin/reviews');
-  const st = (n) => '★'.repeat(n) + '<span style="opacity:.3">' + '★'.repeat(5 - n) + '</span>';
-  $('rvAdmin').innerHTML = `<h2 style="margin-bottom:4px">⭐ Avaliações das clientes</h2>
-    <p class="small">${r.total ? `Média <strong>${String(r.media).replace('.', ',')}</strong> em ${r.total} ${r.total === 1 ? 'avaliação' : 'avaliações'}. Os comentários aparecem na página inicial (os 6 mais recentes).` : 'Ainda não há avaliações. Elas aparecem na página inicial do site.'}</p>
-    ${r.itens.map((i) => `<div class="ap"><div class="info"><strong style="color:#f0a81c">${st(i.estrelas)}</strong> <span class="small">${esc(i.nome)} · ${fmt(i.data)}</span>${i.texto ? `<div>${esc(i.texto)}</div>` : ''}</div>
-      <button class="btn bad sm" data-rv="${i.id}" aria-label="Excluir avaliação">🗑</button></div>`).join('')}`;
+  $('rvAdmin').innerHTML = skeleton(2);
+  RV.data = await api('/api/admin/reviews');
+  renderReviewsAdmin();
 }
-$('rvAdmin').addEventListener('click', (e) => {
+function renderReviewsAdmin() {
+  const r = RV.data, max = Math.max(1, ...r.dist);
+  const lista = r.itens.filter((i) => RV.f === 'all' ? true : RV.f === 'oculto' ? i.oculto : RV.f === 'texto' ? !!i.texto : i.estrelas === +RV.f);
+  $('rvAdmin').innerHTML = `
+    <div class="rva-top">
+      <div class="rv-score"><strong>${r.total ? String(r.media).replace('.', ',') : '—'}</strong><div class="stars" aria-hidden="true">${[1, 2, 3, 4, 5].map((i) => `<span class="${i <= Math.round(r.media) ? 'on' : ''}">★</span>`).join('')}</div><span class="small">${r.total} ${r.total === 1 ? 'avaliação visível' : 'avaliações visíveis'}${r.ocultas ? ` · ${r.ocultas} oculta${r.ocultas > 1 ? 's' : ''}` : ''}</span></div>
+      <div class="rva-dist">${[5, 4, 3, 2, 1].map((n) => `<div><span>${n}★</span><i><b style="width:${(r.dist[n - 1] / max) * 100}%"></b></i><span class="small">${r.dist[n - 1]}</span></div>`).join('')}</div>
+      <div class="rva-cfg">
+        <label class="chk"><input type="checkbox" id="rvExibir" ${r.cfg.exibir ? 'checked' : ''}> Mostrar avaliações no site</label>
+        <label class="chk"><input type="checkbox" id="rvAberto" ${r.cfg.aberto ? 'checked' : ''} ${r.cfg.exibir ? '' : 'disabled'}> Aceitar novas avaliações</label>
+        <p class="small">Ocultar uma avaliação a tira do site e da média, sem apagar.</p>
+      </div>
+    </div>
+    <div class="chips" id="rvFilter" style="margin:14px 0 8px">${[['all', 'Todas'], ['5', '5★'], ['4', '4★'], ['3', '3★'], ['2', '2★'], ['1', '1★'], ['texto', 'Com comentário'], ['oculto', 'Ocultas']].map(([v, l]) => `<button type="button" class="chip ${RV.f === v ? 'on' : ''}" data-f="${v}">${l}</button>`).join('')}</div>
+    ${lista.length ? lista.map((i) => `<div class="ap ${i.oculto ? 'past' : ''}"><div class="info"><strong style="color:#f0a81c">${rvStars(i.estrelas)}</strong> <span class="small">${esc(i.nome)} · ${fmt(i.data)}${i.oculto ? ' · <b>oculta no site</b>' : ''}</span>${i.texto ? `<div>${esc(i.texto)}</div>` : ''}</div>
+      <div class="row" style="flex:0 0 auto;flex-wrap:nowrap;gap:6px"><button class="btn sec sm" data-hide="${i.id}" data-to="${i.oculto ? 0 : 1}">${i.oculto ? '👁 Mostrar' : '🙈 Ocultar'}</button><button class="btn bad sm" data-rv="${i.id}" aria-label="Excluir avaliação">🗑</button></div></div>`).join('')
+      : `<div class="empty"><span class="big">⭐</span>${r.itens.length ? 'Nenhuma avaliação neste filtro.' : 'Ainda não há avaliações. Elas aparecem aqui quando as clientes avaliarem pela página inicial.'}</div>`}`;
+}
+$('rvAdmin').addEventListener('click', async (e) => {
+  const f = e.target.closest('[data-f]'); if (f) { RV.f = f.dataset.f; return renderReviewsAdmin(); }
+  const h = e.target.closest('[data-hide]');
+  if (h) { try { await api('/api/admin/reviews/' + h.dataset.hide, 'PATCH', { oculto: h.dataset.to === '1' }); toast(h.dataset.to === '1' ? 'Avaliação oculta no site' : 'Avaliação visível no site', 'ok'); loadReviewsAdmin(); } catch (err) { toast(err.message, 'err'); } return; }
   const b = e.target.closest('[data-rv]'); if (!b) return;
-  confirmDelete('Excluir avaliação?', 'A avaliação some da página inicial e a média é recalculada.', async () => {
+  confirmDelete('Excluir avaliação?', 'A avaliação é apagada de vez e a média é recalculada. Para só tirar do site, use "Ocultar".', async () => {
     await api('/api/admin/reviews/' + b.dataset.rv, 'DELETE'); loadReviewsAdmin(); return 'Avaliação excluída';
   });
+});
+$('rvAdmin').addEventListener('change', async (e) => {
+  if (e.target.id !== 'rvExibir' && e.target.id !== 'rvAberto') return;
+  try { await api('/api/admin/reviews-config', 'PUT', { exibir: $('rvExibir').checked, aberto: $('rvAberto').checked }); toast('Salvo', 'ok'); loadReviewsAdmin(); } catch (err) { toast(err.message, 'err'); }
 });
 
 function ldFieldHtml(c) {

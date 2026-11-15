@@ -422,7 +422,7 @@ code{background:var(--gray-bg);padding:1px 6px;border-radius:6px;font-size:.85em
 .ld-prev .lp-sub{font-size:.95rem;margin-bottom:12px}
 .ld-prev .lp-perks{margin-bottom:14px;gap:8px}
 .ld-prev .btn.lg{padding:10px 20px;font-size:.9rem;pointer-events:none}
-@media (max-width:899px){.tabbar{grid-template-columns:repeat(7,1fr)}.tb-item{font-size:.58rem}.tb-item .ni{padding:2px 8px;font-size:1.2rem}}
+@media (max-width:899px){.tabbar{grid-template-columns:repeat(8,1fr)}.tb-item{font-size:.58rem}.tb-item .ni{padding:2px 8px;font-size:1.2rem}}
 
 /* Menu lateral: nunca corta itens em telas baixas (rola e fica compacto) */
 .side{height:100vh;height:100dvh;overflow-y:auto;overscroll-behavior:contain}
@@ -592,3 +592,12 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
   .rv-wrap{grid-template-columns:260px 1fr}
   .rv-list{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
 }
+
+/* ---------- Admin: avaliações ---------- */
+.rva-top{display:grid;grid-template-columns:170px 1fr 1fr;gap:20px;align-items:center}
+.rva-dist{display:grid;gap:6px}
+.rva-dist>div{display:grid;grid-template-columns:28px 1fr 28px;gap:8px;align-items:center;font-size:.85rem}
+.rva-dist i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.rva-dist b{display:block;height:100%;background:#f0a81c;border-radius:99px}
+.rva-cfg .chk{margin:0 0 8px}
+@media (max-width:760px){.rva-top{grid-template-columns:1fr}}

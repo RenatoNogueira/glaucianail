@@ -450,3 +450,21 @@ test('avaliações: estrelas públicas, validação, limite e exclusão pelo adm
   assert.equal((await c('/api/reviews')).json.total, 1);
   assert.equal((await c('/api/admin/reviews')).status, 401, 'lista admin é restrita');
 });
+
+test('avaliações: admin oculta, fecha e desliga a seção', async () => {
+  const c = client();
+  await c('/api/reviews', { method: 'POST', body: { estrelas: 3, nome: 'Carla', texto: 'ok' } });
+  const l = (await admin('/api/admin/reviews')).json;
+  const id = l.itens[0].id, antes = l.total;
+  assert.equal((await admin('/api/admin/reviews/' + id, { method: 'PATCH', body: { oculto: 'sim' } })).status, 400);
+  assert.equal((await admin('/api/admin/reviews/' + id, { method: 'PATCH', body: { oculto: true } })).status, 200);
+  const dep = (await admin('/api/admin/reviews')).json;
+  assert.equal(dep.total, antes - 1, 'oculta sai da média'); assert.equal(dep.ocultas, 1);
+  assert.ok(!(await c('/api/reviews')).json.itens.some((i) => i.nome === 'Carla'), 'oculta não aparece no site');
+  assert.equal((await c('/api/admin/reviews/' + id, { method: 'PATCH', body: { oculto: false } })).status, 401, 'só o admin');
+  assert.equal((await admin('/api/admin/reviews-config', { method: 'PUT', body: { exibir: true, aberto: false } })).status, 200);
+  assert.equal((await c('/api/reviews', { method: 'POST', body: { estrelas: 5, nome: 'Dani' } })).status, 403, 'fechadas');
+  await admin('/api/admin/reviews-config', { method: 'PUT', body: { exibir: false, aberto: true } });
+  assert.equal((await c('/api/reviews')).json.exibir, false, 'seção desligada');
+  await admin('/api/admin/reviews-config', { method: 'PUT', body: { exibir: true, aberto: true } });
+});
