@@ -53,14 +53,34 @@ async function loadLanding() {
     <div class="lp-svc"><span class="lp-ic">${esc(s.icone || ICONS[s.id] || '💅')}</span>
       <strong>${esc(s.nome)}</strong><span class="small">${s.minutos} min</span><span class="price">R$ ${Number(s.preco).toFixed(2).replace('.', ',')}</span></div>`).join('');
   $('lpFoot').textContent = (T.rodape || '© {ano} {nome} · Agendamento online').split('{ano}').join(new Date().getFullYear()).split('{nome}').join(cfg.studio);
-  loadReviews();
+  loadReviews(); initReveal();
   try {
     const n = await api('/api/next-slots?limit=4');
     $('lpNextSec').hidden = !n.length;
     $('lpNext').innerHTML = n.map((x) => `<button type="button" class="qs" data-d="${x.date}"><small>${rel(x.date)}</small><strong>${x.time}</strong></button>`).join('');
     $('lpNext').querySelectorAll('.qs').forEach((b) => (b.onclick = () => focusAuth('reg')));
+    initReveal();
   } catch { $('lpNextSec').hidden = true; }
 }
+// ---------- Animações ao rolar a página ----------
+const RV_SEL = '.lp-head, .lp-svc, .lp-step, .qs, .rv-wrap, .rv-item, .lp-foot';
+let rvObs = null;
+function initReveal() {
+  const reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduz || !('IntersectionObserver' in window)) return;
+  rvObs = rvObs || new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('in'); rvObs.unobserve(e.target);
+    setTimeout(() => e.target.style.setProperty('--i', 0), 1200); // depois de aparecer, o hover não tem atraso
+  }), { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+  document.querySelectorAll('#auth ' + RV_SEL.split(', ').join(', #auth ')).forEach((el) => {
+    if (el.dataset.rv) return; el.dataset.rv = 1;
+    const irmaos = [...el.parentElement.children].filter((x) => x.matches(RV_SEL));
+    el.style.setProperty('--i', Math.min(irmaos.indexOf(el), 6));
+    el.classList.add('rv'); rvObs.observe(el);
+  });
+}
+
 // ---------- Avaliações com estrelas ----------
 const starsHtml = (n) => [1, 2, 3, 4, 5].map((i) => `<span class="${i <= Math.round(n) ? 'on' : ''}">★</span>`).join('');
 let rvNota = 0;
@@ -77,6 +97,7 @@ async function loadReviews() {
     $('rvAvgStars').innerHTML = starsHtml(r.media);
     $('rvCount').textContent = r.total ? `${r.total} ${r.total === 1 ? 'avaliação' : 'avaliações'}` : 'Seja a primeira a avaliar!';
     $('rvList').innerHTML = r.itens.map((i) => `<div class="rv-item"><div class="stars sm">${starsHtml(i.estrelas)}</div><p>${esc(i.texto)}</p><span class="small">${esc(i.nome)} · ${fmt(i.data)}</span></div>`).join('');
+    initReveal();
   } catch {}
 }
 $('rvForm').onsubmit = async (e) => {
