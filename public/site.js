@@ -53,6 +53,7 @@ async function loadLanding() {
     <div class="lp-svc"><span class="lp-ic">${esc(s.icone || ICONS[s.id] || '💅')}</span>
       <strong>${esc(s.nome)}</strong><span class="small">${s.minutos} min</span><span class="price">R$ ${Number(s.preco).toFixed(2).replace('.', ',')}</span></div>`).join('');
   $('lpFoot').textContent = (T.rodape || '© {ano} {nome} · Agendamento online').split('{ano}').join(new Date().getFullYear()).split('{nome}').join(cfg.studio);
+  loadReviews();
   try {
     const n = await api('/api/next-slots?limit=4');
     $('lpNextSec').hidden = !n.length;
@@ -60,6 +61,33 @@ async function loadLanding() {
     $('lpNext').querySelectorAll('.qs').forEach((b) => (b.onclick = () => focusAuth('reg')));
   } catch { $('lpNextSec').hidden = true; }
 }
+// ---------- Avaliações com estrelas ----------
+const starsHtml = (n) => [1, 2, 3, 4, 5].map((i) => `<span class="${i <= Math.round(n) ? 'on' : ''}">★</span>`).join('');
+let rvNota = 0;
+function rvPaint() {
+  $('rvPick').querySelectorAll('button').forEach((b) => { const on = +b.dataset.n <= rvNota; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(+b.dataset.n === rvNota)); });
+  $('rvMore').classList.toggle('hidden', !rvNota);
+  $('rvHint').textContent = rvNota ? ['', 'Ruim', 'Regular', 'Bom', 'Muito bom', 'Excelente!'][rvNota] : 'Toque nas estrelas para avaliar';
+}
+$('rvPick').onclick = (e) => { const b = e.target.closest('button[data-n]'); if (b) { rvNota = +b.dataset.n; rvPaint(); } };
+async function loadReviews() {
+  try {
+    const r = await api('/api/reviews');
+    $('rvAvg').textContent = r.total ? String(r.media).replace('.', ',') : '—';
+    $('rvAvgStars').innerHTML = starsHtml(r.media);
+    $('rvCount').textContent = r.total ? `${r.total} ${r.total === 1 ? 'avaliação' : 'avaliações'}` : 'Seja a primeira a avaliar!';
+    $('rvList').innerHTML = r.itens.map((i) => `<div class="rv-item"><div class="stars sm">${starsHtml(i.estrelas)}</div><p>${esc(i.texto)}</p><span class="small">${esc(i.nome)} · ${fmt(i.data)}</span></div>`).join('');
+  } catch {}
+}
+$('rvForm').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await api('/api/reviews', 'POST', { estrelas: rvNota, nome: $('rvName').value, texto: $('rvText').value });
+    toast('Obrigada pela sua avaliação! 💖', 'ok');
+    rvNota = 0; $('rvName').value = ''; $('rvText').value = ''; rvPaint(); loadReviews();
+  } catch (err) { toast(err.message, 'err'); }
+};
+
 $('tLogin').onclick = () => setMode('login');
 $('tReg').onclick = () => setMode('reg');
 $('eye').onclick = () => {

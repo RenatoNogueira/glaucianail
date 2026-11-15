@@ -54,6 +54,25 @@
     </div>
   </section>
 
+  <section class="lp-sec" id="lpRev">
+    <div class="lp-head"><h2>Avaliações</h2><p class="small" id="rvSum">Conte como foi o seu atendimento.</p></div>
+    <div class="rv-wrap">
+      <div class="rv-score"><strong id="rvAvg">—</strong><div class="stars" id="rvAvgStars" aria-hidden="true"></div><span class="small" id="rvCount"></span></div>
+      <form class="rv-form" id="rvForm" novalidate>
+        <div class="rv-pick" id="rvPick" role="radiogroup" aria-label="Sua nota">
+          <button type="button" role="radio" aria-checked="false" data-n="1" aria-label="1 estrela">★</button><button type="button" role="radio" aria-checked="false" data-n="2" aria-label="2 estrelas">★</button><button type="button" role="radio" aria-checked="false" data-n="3" aria-label="3 estrelas">★</button><button type="button" role="radio" aria-checked="false" data-n="4" aria-label="4 estrelas">★</button><button type="button" role="radio" aria-checked="false" data-n="5" aria-label="5 estrelas">★</button>
+          <span class="small" id="rvHint">Toque nas estrelas para avaliar</span>
+        </div>
+        <div id="rvMore" class="hidden">
+          <input id="rvName" maxlength="40" placeholder="Seu nome" autocomplete="given-name" aria-label="Seu nome">
+          <textarea id="rvText" maxlength="300" rows="3" placeholder="Quer deixar um comentário? (opcional)" aria-label="Comentário"></textarea>
+          <button class="btn" id="rvSend">Enviar avaliação</button>
+        </div>
+      </form>
+    </div>
+    <div class="rv-list" id="rvList"></div>
+  </section>
+
   <footer class="lp-foot"><span id="lpFoot"></span></footer>
 </section>
 

@@ -603,7 +603,24 @@ async function loadLanding() {
   const r = await api('/api/admin/landing');
   LD.campos = r.campos; LD.grupos = r.grupos; LD.valores = { ...r.valores }; LD.salvo = { ...r.valores };
   renderLanding();
+  loadReviewsAdmin();
 }
+
+// Avaliações recebidas (estrelas): ver e excluir
+async function loadReviewsAdmin() {
+  const r = await api('/api/admin/reviews');
+  const st = (n) => '★'.repeat(n) + '<span style="opacity:.3">' + '★'.repeat(5 - n) + '</span>';
+  $('rvAdmin').innerHTML = `<h2 style="margin-bottom:4px">⭐ Avaliações das clientes</h2>
+    <p class="small">${r.total ? `Média <strong>${String(r.media).replace('.', ',')}</strong> em ${r.total} ${r.total === 1 ? 'avaliação' : 'avaliações'}. Os comentários aparecem na página inicial (os 6 mais recentes).` : 'Ainda não há avaliações. Elas aparecem na página inicial do site.'}</p>
+    ${r.itens.map((i) => `<div class="ap"><div class="info"><strong style="color:#f0a81c">${st(i.estrelas)}</strong> <span class="small">${esc(i.nome)} · ${fmt(i.data)}</span>${i.texto ? `<div>${esc(i.texto)}</div>` : ''}</div>
+      <button class="btn bad sm" data-rv="${i.id}" aria-label="Excluir avaliação">🗑</button></div>`).join('')}`;
+}
+$('rvAdmin').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-rv]'); if (!b) return;
+  confirmDelete('Excluir avaliação?', 'A avaliação some da página inicial e a média é recalculada.', async () => {
+    await api('/api/admin/reviews/' + b.dataset.rv, 'DELETE'); loadReviewsAdmin(); return 'Avaliação excluída';
+  });
+});
 
 function ldFieldHtml(c) {
   const v = ldVal(c), id = 'ld_' + c.key;

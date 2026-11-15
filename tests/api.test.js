@@ -435,3 +435,18 @@ test('agenda: calendário mensal publica só nos dias escolhidos', async () => {
   const dias = new Set((await admin('/api/admin/slots')).json.filter((s) => s.date >= d1 && s.date <= d2).map((s) => s.date));
   assert.deepEqual([...dias].sort(), [d1, d2].sort(), 'dias do meio ficam sem horários');
 });
+
+test('avaliações: estrelas públicas, validação, limite e exclusão pelo admin', async () => {
+  const c = client();
+  assert.equal((await c('/api/reviews', { method: 'POST', body: { estrelas: 6, nome: 'Ana' } })).status, 400, 'nota inválida');
+  assert.equal((await c('/api/reviews', { method: 'POST', body: { estrelas: 5, nome: '' } })).status, 400, 'sem nome');
+  const a = await c('/api/reviews', { method: 'POST', body: { estrelas: 5, nome: 'Ana', texto: '<b>Amei</b>' } });
+  assert.equal(a.status, 201);
+  assert.equal((await c('/api/reviews', { method: 'POST', body: { estrelas: 4, nome: 'Bia' } })).status, 201);
+  const l = (await c('/api/reviews')).json;
+  assert.equal(l.total, 2); assert.equal(l.media, 4.5); assert.equal(l.itens.length, 1, 'só comentários aparecem');
+  const adm = (await admin('/api/admin/reviews')).json;
+  assert.equal((await admin('/api/admin/reviews/' + adm.itens[0].id, { method: 'DELETE' })).status, 200);
+  assert.equal((await c('/api/reviews')).json.total, 1);
+  assert.equal((await c('/api/admin/reviews')).status, 401, 'lista admin é restrita');
+});

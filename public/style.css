@@ -508,3 +508,22 @@ img,video,svg{max-width:100%}
 .lg.free{background:rgba(46,160,110,.6)}.lg.busy{background:rgba(194,69,111,.6)}.lg.none{border:1.5px solid var(--muted)}
 #mcRanges{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
 @media (max-width:520px){.mcd{min-height:50px}.mcd small{font-size:.56rem}}
+
+/* ---------- Avaliações (estrelas) ---------- */
+.stars{display:inline-flex;gap:2px;font-size:1.3rem;line-height:1}
+.stars span{color:var(--line)}.stars span.on{color:#f0a81c}
+.stars.sm{font-size:1rem}
+.rv-wrap{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--shadow)}
+.rv-score{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.rv-score strong{font-size:2.6rem;line-height:1;font-family:inherit}
+.rv-pick{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.rv-pick button{border:0;background:transparent;font-size:2.1rem;line-height:1;padding:2px 3px;color:var(--line);cursor:pointer;transition:transform .1s,color .15s}
+.rv-pick button:hover{transform:scale(1.15)}
+.rv-pick button.on{color:#f0a81c}
+.rv-pick .small{margin-left:10px}
+#rvMore{margin-top:10px;display:grid;gap:10px}
+#rvMore.hidden{display:none}
+.rv-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:14px}
+.rv-item{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.rv-item p{margin:6px 0 8px;overflow-wrap:anywhere}
+@media (max-width:640px){.rv-wrap{grid-template-columns:1fr}}

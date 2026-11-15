@@ -511,6 +511,39 @@ app.delete('/api/admin/settings/logo', needAdmin, wrap(async (req, res) => {
 }));
 
 // ----- Textos da página inicial (editáveis pela admin) -----
+// ----- Avaliações (estrelas) da página inicial -----
+// Ficam em settings.reviews (já persistido nos três modos de armazenamento). Qualquer visitante avalia; o painel admin pode excluir.
+const MAX_REVIEWS = 500;
+function reviewStats() {
+  const l = db.settings.reviews || [], dist = [0, 0, 0, 0, 0];
+  l.forEach((r) => dist[r.estrelas - 1]++);
+  return { total: l.length, media: l.length ? Math.round((l.reduce((s, r) => s + r.estrelas, 0) / l.length) * 10) / 10 : 0, dist };
+}
+app.get('/api/reviews', (req, res) => {
+  const itens = (db.settings.reviews || []).filter((r) => r.texto).slice(-6).reverse().map((r) => ({ nome: r.nome, estrelas: r.estrelas, texto: r.texto, data: r.data }));
+  res.json({ ...reviewStats(), itens });
+});
+app.post('/api/reviews', wrap(async (req, res) => {
+  const b = req.body || {}, key = `r:${req.ip}`;
+  if (limiter.blocked(key, 3)) return res.status(429).json({ erro: 'Você já enviou avaliações recentemente. Tente novamente mais tarde.' });
+  const estrelas = +b.estrelas, nome = String(b.nome || '').trim().replace(/\s+/g, ' ').slice(0, 40), texto = String(b.texto || '').trim().slice(0, 300);
+  if (!Number.isInteger(estrelas) || estrelas < 1 || estrelas > 5) return res.status(400).json({ erro: 'Escolha de 1 a 5 estrelas.' });
+  if (nome.length < 2) return res.status(400).json({ erro: 'Informe seu nome.' });
+  const l = db.settings.reviews = db.settings.reviews || [];
+  l.push({ id: nextId(), nome, estrelas, texto, data: new Date().toISOString().slice(0, 10) });
+  if (l.length > MAX_REVIEWS) l.splice(0, l.length - MAX_REVIEWS);
+  await save();
+  limiter.fail(key, 60 * 60e3);
+  res.status(201).json({ ok: true, ...reviewStats() });
+}));
+app.get('/api/admin/reviews', needAdmin, (req, res) => res.json({ ...reviewStats(), itens: [...(db.settings.reviews || [])].reverse() }));
+app.delete('/api/admin/reviews/:id', needAdmin, wrap(async (req, res) => {
+  const l = db.settings.reviews || [], i = l.findIndex((r) => r.id === +req.params.id);
+  if (i < 0) return res.status(404).json({ erro: 'Avaliação não encontrada.' });
+  l.splice(i, 1); await save();
+  res.json({ ok: true });
+}));
+
 app.get('/api/admin/landing', needAdmin, (req, res) => res.json({ grupos: landing.GRUPOS, campos: landing.CAMPOS, valores: db.settings.landing || {} }));
 app.put('/api/admin/landing', needAdmin, wrap(async (req, res) => {
   const r = landing.validar((req.body || {}).valores);
