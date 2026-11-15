@@ -132,7 +132,7 @@ function blurCarousel(id, dotsId, o = {}) {
   list.addEventListener('touchstart', () => (pausa = true), { passive: true });
   list.addEventListener('touchend', () => setTimeout(() => (pausa = false), 4000), { passive: true });
   const reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!reduz) setInterval(() => {
+  if (!reduz && o.auto !== false) setInterval(() => {
     if (pausa || sel || document.hidden || !ativo()) return;
     const n = list.children.length, i = indice();
     centrar(i >= n - 1 ? 0 : i + 1);
@@ -142,8 +142,8 @@ function blurCarousel(id, dotsId, o = {}) {
   return pedir;
 }
 const svcCarousel = () => blurCarousel('lpServices', 'svcDots', { rotulo: 'Ver serviço', selecionavel: true });
-const nextCarousel = () => blurCarousel('lpNext', 'nextDots', { rotulo: 'Ver horário' });
-const stepsCarousel = () => blurCarousel('lpSteps', 'stepsDots', { rotulo: 'Ver passo', selecionavel: true });
+const nextCarousel = () => blurCarousel('lpNext', 'nextDots', { rotulo: 'Ver horário', auto: false });
+const stepsCarousel = () => blurCarousel('lpSteps', 'stepsDots', { rotulo: 'Ver passo', selecionavel: true, auto: false });
 
 // ---------- Avaliações com estrelas ----------
 const starsHtml = (n) => [1, 2, 3, 4, 5].map((i) => `<span class="${i <= Math.round(n) ? 'on' : ''}">★</span>`).join('');
