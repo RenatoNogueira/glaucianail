@@ -53,7 +53,7 @@ async function loadLanding() {
     <div class="lp-svc"><span class="lp-ic">${esc(s.icone || ICONS[s.id] || '💅')}</span>
       <strong>${esc(s.nome)}</strong><span class="small">${s.minutos} min</span><span class="price">R$ ${Number(s.preco).toFixed(2).replace('.', ',')}</span></div>`).join('');
   $('lpFoot').textContent = (T.rodape || '© {ano} {nome} · Agendamento online').split('{ano}').join(new Date().getFullYear()).split('{nome}').join(cfg.studio);
-  loadReviews(); initReveal();
+  svcCarousel(); loadReviews(); initReveal();
   try {
     const n = await api('/api/next-slots?limit=4');
     $('lpNextSec').hidden = !n.length;
@@ -63,6 +63,7 @@ async function loadLanding() {
   } catch { $('lpNextSec').hidden = true; }
 }
 // ---------- Animações ao rolar a página ----------
+const MOBILE = window.matchMedia('(max-width: 640px)');
 const RV_SEL = '.lp-head, .lp-svc, .lp-step, .qs, .rv-wrap, .rv-item, .lp-foot';
 let rvObs = null;
 function initReveal() {
@@ -75,10 +76,53 @@ function initReveal() {
   }), { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
   document.querySelectorAll('#auth ' + RV_SEL.split(', ').join(', #auth ')).forEach((el) => {
     if (el.dataset.rv) return; el.dataset.rv = 1;
+    if (el.classList.contains('lp-svc') && MOBILE.matches) return; // no celular, os serviços têm o efeito do carrossel
     const irmaos = [...el.parentElement.children].filter((x) => x.matches(RV_SEL));
     el.style.setProperty('--i', Math.min(irmaos.indexOf(el), 6));
     el.classList.add('rv'); rvObs.observe(el);
   });
+}
+
+// ---------- Serviços: carrossel com desfoque (celular) ----------
+let svcTimer = null, svcOn = false;
+function svcCarousel() {
+  const list = $('lpServices'), dots = $('svcDots');
+  if (svcOn) return window.svcRefresh(); // os ouvintes são registrados uma só vez
+  svcOn = true;
+  const ativo = () => MOBILE.matches && list.scrollWidth > list.clientWidth + 8;
+  let raf = 0;
+  const efeito = () => {
+    raf = 0;
+    const cs = [...list.children];
+    if (!ativo()) { cs.forEach((c) => { c.style.removeProperty('--d'); }); dots.hidden = true; return; }
+    const centro = list.getBoundingClientRect().left + list.clientWidth / 2;
+    let melhor = 0, dm = 1e9;
+    cs.forEach((c, i) => {
+      const r = c.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - centro);
+      if (d < dm) { dm = d; melhor = i; }
+      c.style.setProperty('--d', Math.min(d / (r.width * 1.1), 1).toFixed(3)); // 0 = no centro, 1 = longe (mais desfocado)
+    });
+    if (dots.children.length !== cs.length) dots.innerHTML = cs.map((_, i) => `<button type="button" data-i="${i}" aria-label="Ver serviço ${i + 1}"></button>`).join('');
+    dots.hidden = false;
+    [...dots.children].forEach((b, i) => b.classList.toggle('on', i === melhor));
+  };
+  const pedir = () => { if (!raf) raf = requestAnimationFrame(efeito); };
+  const centrar = (i) => { const c = list.children[i]; if (c) list.scrollTo({ left: c.offsetLeft - (list.clientWidth - c.offsetWidth) / 2, behavior: 'smooth' }); };
+  const indice = () => [...dots.children].findIndex((b) => b.classList.contains('on'));
+  list.addEventListener('scroll', pedir, { passive: true });
+  addEventListener('resize', pedir);
+  dots.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) centrar(+b.dataset.i); };
+  let pausa = false;
+  list.addEventListener('touchstart', () => (pausa = true), { passive: true });
+  list.addEventListener('touchend', () => setTimeout(() => (pausa = false), 4000), { passive: true });
+  const reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduz) svcTimer = setInterval(() => {
+    if (pausa || document.hidden || !ativo()) return;
+    const n = list.children.length, i = indice();
+    centrar(i >= n - 1 ? 0 : i + 1);
+  }, 4000);
+  window.svcRefresh = pedir;
+  setTimeout(pedir, 50);
 }
 
 // ---------- Avaliações com estrelas ----------

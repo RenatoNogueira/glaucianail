@@ -617,3 +617,20 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
 .rv-dots[hidden]{display:none}
 .rv-dots button{width:8px;height:8px;border-radius:99px;border:0;padding:0;background:var(--line);cursor:pointer;transition:width .25s,background .25s}
 .rv-dots button.on{width:24px;background:var(--rose)}
+
+/* ---------- Serviços em carrossel com desfoque (celular) ---------- */
+.svc-dots{display:flex;justify-content:center;gap:7px;margin-top:6px;flex-wrap:wrap}
+.svc-dots[hidden]{display:none}
+.svc-dots button{width:8px;height:8px;border-radius:99px;border:0;padding:0;background:var(--line);transition:width .25s,background .25s}
+.svc-dots button.on{width:24px;background:var(--rose)}
+@media (min-width:641px){.svc-dots{display:none}}
+@media (max-width:640px){
+  .landing .lp-svcs{display:flex;grid-template-columns:none;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;
+    margin:0 calc(-1 * clamp(16px,4vw,80px));padding:18px calc(50% - 105px) 22px}
+  .landing .lp-svcs::-webkit-scrollbar{display:none}
+  .landing .lp-svcs .lp-svc{flex:0 0 210px;scroll-snap-align:center;padding:20px 18px;
+    filter:blur(calc(var(--d,0) * 4.5px));opacity:calc(1 - var(--d,0) * .5);scale:calc(1 - var(--d,0) * .14);
+    transition:filter .2s,opacity .2s,scale .2s;will-change:filter,scale}
+  .landing .lp-svcs .lp-svc:hover{transform:none}
+}
+@media (max-width:640px) and (prefers-reduced-motion:reduce){.landing .lp-svcs .lp-svc{filter:none;scale:1;opacity:1}}
