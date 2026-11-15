@@ -679,3 +679,7 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
 }
 @supports not (backdrop-filter:blur(1px)){.topbar{background:var(--card)}}
 .topbar .end{justify-self:end;justify-content:flex-end}
+
+/* Evita o "piscar" do ícone/nome padrão antes de a marca real carregar */
+html:not(.brand-ready) [data-brand-logo],html:not(.brand-ready) [data-brand-name]{visibility:hidden}
+[data-brand-logo],[data-brand-name]{transition:opacity .25s}

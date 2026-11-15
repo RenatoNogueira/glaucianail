@@ -87,9 +87,18 @@ function applyBrand(c) {
     e.innerHTML = c.logo ? `<img src="${esc(c.logo)}" alt="Logo ${esc(c.studio)}">` : esc(e.dataset.fallback || '💅');
     e.classList.toggle('has-logo', !!c.logo);
   });
+  try { localStorage.setItem('brand', JSON.stringify({ studio: c.studio, logo: c.logo || null })); } catch {} // próxima abertura já nasce com a logo certa
+  document.documentElement.classList.add('brand-ready');
   let ic = document.querySelector('link[rel=icon]');
   if (c.logo) { if (!ic) { ic = document.createElement('link'); ic.rel = 'icon'; document.head.append(ic); } ic.href = c.logo; } else if (ic) ic.href = '/icon-192.png'; // sem logo: volta ao ícone padrão
 }
+
+// Ao recarregar (F5), usa a última marca conhecida na hora, em vez de piscar o ícone e o nome padrão até a resposta do servidor chegar.
+// Sem marca guardada (primeira visita), a marca fica invisível por instantes; uma trava de 2 s garante que nunca fique escondida.
+(function () {
+  try { const b = JSON.parse(localStorage.getItem('brand') || 'null'); if (b && b.studio) applyBrand(b); } catch {}
+  setTimeout(() => document.documentElement.classList.add('brand-ready'), 2000);
+})();
 
 // ---------- Instalar como app (PWA) ----------
 // Elementos com [data-install] aparecem no celular (e no computador quando o navegador oferece a instalação).
