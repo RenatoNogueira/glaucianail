@@ -639,3 +639,21 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
   .landing .lp-svcs .lp-svc.sel{border-color:var(--rose);box-shadow:0 0 0 3px rgba(194,69,111,.28),0 14px 34px rgba(194,69,111,.25),var(--glass-sh)}
   .landing .lp-svcs .lp-svc{cursor:pointer;-webkit-tap-highlight-color:transparent}
 }
+
+/* ---------- Mesmo carrossel com desfoque: Próximos horários livres e Como funciona (celular) ---------- */
+@media (max-width:640px){
+  .landing .qs-grid,.landing .lp-steps{display:flex;grid-template-columns:none;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;
+    margin:0 calc(-1 * clamp(16px,4vw,80px));padding:18px 0 22px}
+  .landing .qs-grid{padding-left:calc(50% - 62px);padding-right:calc(50% - 62px)}
+  .landing .lp-steps{padding-left:calc(50% - 115px);padding-right:calc(50% - 115px)}
+  .landing .qs-grid::-webkit-scrollbar,.landing .lp-steps::-webkit-scrollbar{display:none}
+  .landing .qs-grid .qs{flex:0 0 124px}
+  .landing .lp-steps .lp-step{flex:0 0 230px}
+  .landing .qs-grid .qs,.landing .lp-steps .lp-step{scroll-snap-align:center;
+    filter:blur(calc(var(--d,0) * 4.5px));opacity:calc(1 - var(--d,0) * .5);scale:calc(1 - var(--d,0) * .14);
+    transition:filter .2s,opacity .2s,scale .2s,border-color .25s,box-shadow .25s;will-change:filter,scale}
+  .landing .qs-grid .qs:hover{transform:none}
+  .landing .lp-steps .lp-step{cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .landing .lp-steps .lp-step.sel{border-color:var(--rose);box-shadow:0 0 0 3px rgba(194,69,111,.28),0 14px 34px rgba(194,69,111,.25),var(--glass-sh)}
+}
+@media (max-width:640px) and (prefers-reduced-motion:reduce){.landing .qs-grid .qs,.landing .lp-steps .lp-step{filter:none;scale:1;opacity:1}}

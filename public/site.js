@@ -53,13 +53,13 @@ async function loadLanding() {
     <div class="lp-svc"><span class="lp-ic">${esc(s.icone || ICONS[s.id] || '💅')}</span>
       <strong>${esc(s.nome)}</strong><span class="small">${s.minutos} min</span><span class="price">R$ ${Number(s.preco).toFixed(2).replace('.', ',')}</span></div>`).join('');
   $('lpFoot').textContent = (T.rodape || '© {ano} {nome} · Agendamento online').split('{ano}').join(new Date().getFullYear()).split('{nome}').join(cfg.studio);
-  svcCarousel(); loadReviews(); initReveal();
+  svcCarousel(); stepsCarousel(); loadReviews(); initReveal();
   try {
     const n = await api('/api/next-slots?limit=4');
     $('lpNextSec').hidden = !n.length;
     $('lpNext').innerHTML = n.map((x) => `<button type="button" class="qs" data-d="${x.date}"><small>${rel(x.date)}</small><strong>${x.time}</strong></button>`).join('');
     $('lpNext').querySelectorAll('.qs').forEach((b) => (b.onclick = () => focusAuth('reg')));
-    initReveal();
+    initReveal(); nextCarousel();
   } catch { $('lpNextSec').hidden = true; }
 }
 // ---------- Animações ao rolar a página ----------
@@ -76,25 +76,26 @@ function initReveal() {
   }), { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
   document.querySelectorAll('#auth ' + RV_SEL.split(', ').join(', #auth ')).forEach((el) => {
     if (el.dataset.rv) return; el.dataset.rv = 1;
-    if (el.classList.contains('lp-svc') && MOBILE.matches) return; // no celular, os serviços têm o efeito do carrossel
+    if (MOBILE.matches && el.matches('.lp-svc, .lp-step, .qs')) return; // no celular, estes têm o efeito do carrossel
     const irmaos = [...el.parentElement.children].filter((x) => x.matches(RV_SEL));
     el.style.setProperty('--i', Math.min(irmaos.indexOf(el), 6));
     el.classList.add('rv'); rvObs.observe(el);
   });
 }
 
-// ---------- Serviços: carrossel com desfoque (celular) ----------
-let svcTimer = null, svcOn = false;
-function svcCarousel() {
-  const list = $('lpServices'), dots = $('svcDots');
-  if (svcOn) return window.svcRefresh(); // os ouvintes são registrados uma só vez
-  svcOn = true;
+// ---------- Carrossel com desfoque no celular (serviços, horários livres, como funciona) ----------
+// blurCarousel(lista, pontos, { rotulo, selecionavel }): a lista vira um carrossel só em telas de celular (CSS);
+// aqui ficam o desfoque por distância do centro, os pontos, o avanço automático e a pausa ao selecionar um card.
+const carrosseis = {};
+function blurCarousel(id, dotsId, o = {}) {
+  if (carrosseis[id]) return carrosseis[id](); // os ouvintes são registrados uma só vez; a lista pode ser redesenhada
+  const list = $(id), dots = $(dotsId);
   const ativo = () => MOBILE.matches && list.scrollWidth > list.clientWidth + 8;
   let raf = 0;
   const efeito = () => {
     raf = 0;
     const cs = [...list.children];
-    if (!ativo()) { cs.forEach((c) => { c.style.removeProperty('--d'); }); dots.hidden = true; return; }
+    if (!ativo()) { cs.forEach((c) => c.style.removeProperty('--d')); dots.hidden = true; return; }
     const centro = list.getBoundingClientRect().left + list.clientWidth / 2;
     let melhor = 0, dm = 1e9;
     cs.forEach((c, i) => {
@@ -102,8 +103,8 @@ function svcCarousel() {
       if (d < dm) { dm = d; melhor = i; }
       c.style.setProperty('--d', Math.min(d / (r.width * 1.1), 1).toFixed(3)); // 0 = no centro, 1 = longe (mais desfocado)
     });
-    if (dots.children.length !== cs.length) dots.innerHTML = cs.map((_, i) => `<button type="button" data-i="${i}" aria-label="Ver serviço ${i + 1}"></button>`).join('');
-    dots.hidden = false;
+    if (dots.children.length !== cs.length) dots.innerHTML = cs.map((_, i) => `<button type="button" data-i="${i}" aria-label="${o.rotulo || 'Ver item'} ${i + 1}"></button>`).join('');
+    dots.hidden = cs.length < 2;
     [...dots.children].forEach((b, i) => b.classList.toggle('on', i === melhor));
   };
   const pedir = () => { if (!raf) raf = requestAnimationFrame(efeito); };
@@ -116,27 +117,33 @@ function svcCarousel() {
   list.addEventListener('scroll', pedir, { passive: true });
   addEventListener('resize', pedir);
   dots.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) centrar(+b.dataset.i); };
-  // Tocar em um serviço o seleciona e PAUSA o carrossel; tocar de novo (ou fora da lista) solta
+  // Tocar em um card o seleciona e PAUSA o carrossel; tocar de novo (ou fora da lista) solta
   let sel = null;
   const soltar = () => { if (sel) sel.classList.remove('sel'); sel = null; };
-  list.addEventListener('click', (e) => {
-    const c = e.target.closest('.lp-svc'); if (!c || !ativo()) return;
-    if (sel === c) return soltar();
-    soltar(); sel = c; c.classList.add('sel'); centrar([...list.children].indexOf(c));
-  });
-  document.addEventListener('click', (e) => { if (sel && !e.target.closest('#lpServices')) soltar(); });
+  if (o.selecionavel) {
+    list.addEventListener('click', (e) => {
+      const c = e.target.closest('#' + id + ' > *'); if (!c || !ativo()) return;
+      if (sel === c) return soltar();
+      soltar(); sel = c; c.classList.add('sel'); centrar([...list.children].indexOf(c));
+    });
+    document.addEventListener('click', (e) => { if (sel && !e.target.closest('#' + id)) soltar(); });
+  }
   let pausa = false;
   list.addEventListener('touchstart', () => (pausa = true), { passive: true });
   list.addEventListener('touchend', () => setTimeout(() => (pausa = false), 4000), { passive: true });
   const reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!reduz) svcTimer = setInterval(() => {
+  if (!reduz) setInterval(() => {
     if (pausa || sel || document.hidden || !ativo()) return;
     const n = list.children.length, i = indice();
     centrar(i >= n - 1 ? 0 : i + 1);
   }, 4000);
-  window.svcRefresh = pedir;
+  carrosseis[id] = pedir;
   setTimeout(pedir, 50);
+  return pedir;
 }
+const svcCarousel = () => blurCarousel('lpServices', 'svcDots', { rotulo: 'Ver serviço', selecionavel: true });
+const nextCarousel = () => blurCarousel('lpNext', 'nextDots', { rotulo: 'Ver horário' });
+const stepsCarousel = () => blurCarousel('lpSteps', 'stepsDots', { rotulo: 'Ver passo', selecionavel: true });
 
 // ---------- Avaliações com estrelas ----------
 const starsHtml = (n) => [1, 2, 3, 4, 5].map((i) => `<span class="${i <= Math.round(n) ? 'on' : ''}">★</span>`).join('');
