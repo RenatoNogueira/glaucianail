@@ -564,3 +564,15 @@ img,video,svg{max-width:100%}
   .lp-copy>*,.landing .auth-card,.lp-blob{animation:none}
 }
 @supports not (backdrop-filter:blur(1px)){.landing .auth-card,.landing .lp-svc,.landing .lp-step,.landing .qs,.landing .rv-wrap,.landing .rv-item{background:var(--card)}}
+
+/* ---------- Hero com foto ---------- */
+.landing .lp-hero{padding:32px 20px;border-radius:28px;overflow:hidden;min-height:440px}
+@media (min-width:860px){.landing .lp-hero{padding:56px 44px}}
+.landing .lp-hero .lp-blob{display:none}
+.landing .lp-hero::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;
+  background:linear-gradient(100deg,color-mix(in srgb,var(--bg) 90%,transparent) 0%,color-mix(in srgb,var(--bg) 62%,transparent) 42%,color-mix(in srgb,var(--bg) 8%,transparent) 100%),url(/hero.webp) 72% center/cover no-repeat;
+  animation:heroZoom 22s ease-in-out infinite alternate}
+@keyframes heroZoom{from{transform:scale(1)}to{transform:scale(1.07)}}
+@media (max-width:859px){.landing .lp-hero::before{background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 88%,transparent) 0%,color-mix(in srgb,var(--bg) 70%,transparent) 55%,color-mix(in srgb,var(--bg) 40%,transparent) 100%),url(/hero.webp) 75% center/cover no-repeat}}
+.landing .lp-hero .auth-card{background:color-mix(in srgb,var(--card) 62%,transparent)}
+@media (prefers-reduced-motion:reduce){.landing .lp-hero::before{animation:none}}
