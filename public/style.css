@@ -657,3 +657,25 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
   .landing .lp-steps .lp-step.sel{border-color:var(--rose);box-shadow:0 0 0 3px rgba(194,69,111,.28),0 14px 34px rgba(194,69,111,.25),var(--glass-sh)}
 }
 @media (max-width:640px) and (prefers-reduced-motion:reduce){.landing .qs-grid .qs,.landing .lp-steps .lp-step{filter:none;scale:1;opacity:1}}
+
+/* ---------- Barra superior: logo centralizada e maior, vidro em degradê sem borda ---------- */
+.topbar{border:0;border-bottom:0;box-shadow:none;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--card) 82%,transparent) 0%,color-mix(in srgb,var(--card) 52%,transparent) 62%,color-mix(in srgb,var(--card) 14%,transparent) 100%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%)}
+.topbar>div{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;padding-top:10px;padding-bottom:10px}
+.topbar>div::before{content:"";display:block}
+.topbar .brand{justify-self:center;gap:14px;font-size:1.3rem;min-width:0}
+.topbar .who{justify-self:end}
+.topbar .brand i.has-logo{width:76px;height:76px;border-radius:14px;filter:drop-shadow(0 4px 14px rgba(194,69,111,.35))}
+@media (max-width:899px){
+  .topbar .brand i.has-logo{width:60px;height:60px}
+  .topbar .brand{font-size:1.05rem;gap:10px}
+}
+@media (max-width:520px){
+  .topbar>div{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);padding-left:12px;padding-right:12px}
+  .topbar .brand{flex-direction:column;gap:2px;text-align:center}
+  .topbar .brand span{font-size:.9rem;max-width:60vw}
+  .topbar .brand i.has-logo{width:56px;height:56px}
+}
+@supports not (backdrop-filter:blur(1px)){.topbar{background:var(--card)}}
+.topbar .end{justify-self:end;justify-content:flex-end}
