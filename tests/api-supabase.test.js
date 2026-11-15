@@ -9,7 +9,7 @@ before(async () => {
   Object.assign(process.env, {
     SUPABASE_URL: mock.url, SUPABASE_SECRET_KEY: 'sb_secret_teste', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_nao_usada',
     ADMIN_USER: 'admin', ADMIN_PASS: 'senha-de-teste-123', SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789',
-    WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', POSTGRES_PRISMA_URL: '', NODE_ENV: '',
+    WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', POSTGRES_PRISMA_URL: '', NODE_ENV: '', RATE_REGISTER_MAX: '100000', ADMIN_MAX_FAILS: '100000',
   });
   delete process.env.VERCEL;
   app = require('../server');

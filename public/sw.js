@@ -1,11 +1,11 @@
 // Service worker: torna o site instalável e mostra uma página amigável quando não há internet.
 // Dados (API, logo, painel admin e manifestos) NUNCA são guardados: vêm sempre da rede, para nada ficar desatualizado.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `agenda-${VERSION}`;
 const OFFLINE = '/offline.html';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll([OFFLINE, '/icon-192.png'])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll([OFFLINE, '/offline.js', '/icon-192.png'])).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

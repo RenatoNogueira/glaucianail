@@ -4,6 +4,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { createStore } = require('./lib/store');
 const { createSessions, createLimiter } = require('./lib/session');
+const security = require('./lib/security');
 
 // --- .env local (na Vercel as variáveis vêm do painel do projeto) ---
 try {
@@ -121,8 +122,9 @@ const sessions = createSessions({ secret: env.SESSION_SECRET || 'dev-secret-troq
 const limiter = createLimiter();
 const WINDOW = 15 * 60e3;
 
-app.use((req, res, next) => { // cabeçalhos de segurança básicos
-  res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin' });
+const SEC_HEADERS = security.headers();
+app.use((req, res, next) => { // cabeçalhos de segurança (CSP, HSTS, etc.) — os mesmos do vercel.json
+  res.set(SEC_HEADERS);
   next();
 });
 app.use(express.json({ limit: '3mb' })); // comporta o envio da logo (já reduzida pelo navegador); a Vercel limita em 4,5 MB
@@ -187,6 +189,8 @@ app.get('/api/config', (req, res) => res.json({ studio: getStudio(), logo: logoU
 
 // ----- Cliente -----
 app.post('/api/register', wrap(async (req, res) => {
+  const rkey = `reg:${req.ip}`; // freio contra criação em massa de contas (e uso de CPU pelo bcrypt)
+  if (limiter.blocked(rkey, +env.RATE_REGISTER_MAX || 10)) return res.status(429).json({ erro: 'Muitos cadastros deste aparelho. Tente novamente mais tarde.' });
   const { name, phone, password } = req.body || {};
   const nome = String(name || '').trim().replace(/\s+/g, ' ');
   const tel = normPhone(phone);
@@ -197,6 +201,7 @@ app.post('/api/register', wrap(async (req, res) => {
   const u = { id: nextId(), name: nome, phone: tel, hash: bcrypt.hashSync(password, 10) };
   db.users.push(u);
   await save();
+  limiter.fail(rkey, 60 * 60e3);
   req.session.userId = u.id; res.saveSession();
   res.json({ id: u.id, name: u.name, phone: u.phone });
 }));
@@ -277,15 +282,24 @@ app.post('/api/appointments/:id/cancel', needClient, wrap(async (req, res) => {
 }));
 
 // ----- Administrador -----
+// Força bruta no admin: além do freio por IP (em memória), há um freio GLOBAL gravado no banco — vale entre as instâncias
+// da Vercel. Com muitas falhas seguidas, o login do admin fica travado por alguns minutos, mesmo que o atacante troque de IP.
+const ADMIN_MAX_FAILS = +env.ADMIN_MAX_FAILS || 20, ADMIN_LOCK_MS = 15 * 60e3;
 app.post('/api/admin/login', wrap(async (req, res) => {
   const { user, password } = req.body || {};
-  const key = `a:${req.ip}`;
-  if (limiter.blocked(key, 8)) return res.status(429).json({ erro: 'Muitas tentativas. Aguarde alguns minutos.' });
-  if (user !== ADMIN_USER || typeof password !== 'string' || !bcrypt.compareSync(password, ADMIN_HASH)) {
+  const key = `a:${req.ip}`, now = Date.now();
+  const g = db.settings.adminFails || { n: 0, until: 0 };
+  if (limiter.blocked(key, 8) || (g.until > now && g.n >= ADMIN_MAX_FAILS)) return res.status(429).json({ erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+  // sempre confere a senha (mesmo com usuário errado) para o tempo de resposta não revelar se o usuário existe
+  const okPass = typeof password === 'string' && password.length <= 200 && bcrypt.compareSync(password, ADMIN_HASH);
+  if (user !== ADMIN_USER || !okPass) {
     limiter.fail(key, WINDOW);
+    const novo = g.until > now ? { n: g.n + 1, until: g.until } : { n: 1, until: now + ADMIN_LOCK_MS };
+    db.settings.adminFails = novo; await save();
     return res.status(401).json({ erro: 'Usuário ou senha incorretos.' });
   }
   limiter.reset(key);
+  if (db.settings.adminFails) { delete db.settings.adminFails; await save(); }
   req.session.admin = true; res.saveSession();
   res.json({ ok: true });
 }));

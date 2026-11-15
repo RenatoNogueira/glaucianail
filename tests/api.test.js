@@ -36,7 +36,7 @@ function client() {
 }
 
 async function startServer(extraEnv = {}, dataDir = DATA, port = PORT) {
-  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_ENV: '', ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const p = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ADMIN_USER: ADMIN.user, ADMIN_PASS: ADMIN.password, SESSION_SECRET: 'segredo-de-teste-bem-longo-0123456789', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_ID: '', DATABASE_URL: '', POSTGRES_URL: '', SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_ENV: '', RATE_REGISTER_MAX: '100000', ADMIN_MAX_FAILS: '100000', ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
   p.log = '';
   p.stdout.on('data', (d) => (p.log += d)); p.stderr.on('data', (d) => (p.log += d));
   for (let i = 0; i < 60; i++) {
@@ -467,4 +467,67 @@ test('avaliações: admin oculta, fecha e desliga a seção', async () => {
   await admin('/api/admin/reviews-config', { method: 'PUT', body: { exibir: false, aberto: true } });
   assert.equal((await c('/api/reviews')).json.exibir, false, 'seção desligada');
   await admin('/api/admin/reviews-config', { method: 'PUT', body: { exibir: true, aberto: true } });
+});
+
+// ---------- Segurança ----------
+test('segurança: cabeçalhos (CSP, HSTS...) no site e na API; vercel.json igual ao servidor; hash do script confere', async () => {
+  const security = require('../lib/security');
+  const c = client();
+  const r = await c('/api/config');
+  const esperado = security.headers();
+  for (const [k, v] of Object.entries(esperado)) assert.equal(r.headers.get(k.toLowerCase()), v, 'cabeçalho ' + k);
+  const csp = r.headers.get('content-security-policy');
+  assert.match(csp, /frame-ancestors 'none'/); assert.match(csp, /object-src 'none'/); assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/);
+  const pagina = await c('/'); assert.equal(pagina.headers.get('content-security-policy'), csp, 'páginas estáticas também');
+  // todo script embutido nas páginas precisa estar liberado pelo hash da CSP
+  for (const f of ['index.html', 'admin.html']) {
+    const html = fs.readFileSync(path.join(ROOT, 'public', f), 'utf8');
+    for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+      const h = "'sha256-" + require('node:crypto').createHash('sha256').update(m[1]).digest('base64') + "'";
+      assert.ok(csp.includes(h), 'hash do script de ' + f + ' fora da CSP (rode npm run headers)');
+    }
+    assert.doesNotMatch(html, /\son(click|load|error|change|submit)=/i, f + ' não pode ter manipuladores inline (CSP)');
+  }
+  const vj = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).headers.find((h) => h.source === '/(.*)').headers;
+  assert.deepEqual(Object.fromEntries(vj.map((h) => [h.key, h.value])), esperado, 'vercel.json desatualizado: rode npm run headers');
+});
+
+test('segurança: cadastro em massa é freado e login do admin trava globalmente após muitas falhas', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-sec-')), port = PORT + 777;
+  const p = await startServer({ RATE_REGISTER_MAX: '3', ADMIN_MAX_FAILS: '4' }, dir, port);
+  try {
+    const call = async (url, body, ip) => { const r = await fetch(`http://127.0.0.1:${port}${url}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip }, body: JSON.stringify(body) }); return r.status; };
+    let st = [];
+    for (let i = 0; i < 4; i++) st.push(await call('/api/register', { name: 'Fulana ' + i, phone: '1190000000' + i, password: 'senha123' }, '9.9.9.9'));
+    assert.deepEqual(st, [200, 200, 200, 429], 'o 4º cadastro do mesmo IP é barrado');
+    // falhas vindas de IPs diferentes (o freio por IP não pega), mas o freio global sim
+    st = [];
+    for (let i = 0; i < 5; i++) st.push(await call('/api/admin/login', { user: 'admin', password: 'errada' + i }, '8.8.8.' + i));
+    assert.deepEqual(st, [401, 401, 401, 401, 429]);
+    // com o travamento ativo, nem a senha certa entra
+    assert.equal(await call('/api/admin/login', ADMIN, '7.7.7.7'), 429);
+  } finally { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('segurança: sessão do admin vale 2 h; cookie é HttpOnly + SameSite; assinatura adulterada é recusada', async () => {
+  const c = client();
+  const r = await c('/api/admin/login', { method: 'POST', body: ADMIN, headers: { 'X-Forwarded-For': '6.6.6.6' } }); // IP à parte: o teste de força bruta acima bloqueou o 127.0.0.1
+  assert.equal(r.status, 200);
+  const ck = r.setCookie[0];
+  assert.match(ck, /HttpOnly/); assert.match(ck, /SameSite=Lax/); assert.match(ck, /Max-Age=7200/);
+  const falso = client();
+  const [corpo] = decodeURIComponent(ck.split(';')[0].split('=')[1]).split('.');
+  const forjado = Buffer.from(JSON.stringify({ a: true, exp: Date.now() + 1e7 })).toString('base64url');
+  assert.equal((await falso('/api/admin/appointments', { headers: { Cookie: 'sid=' + forjado + '.assinaturaFalsa' } })).status, 401, 'cookie forjado');
+  assert.equal((await falso('/api/admin/appointments', { headers: { Cookie: 'sid=' + corpo + '.abc' } })).status, 401, 'assinatura trocada');
+  assert.equal((await falso('/api/admin/backup')).status, 401, 'backup é restrito');
+  assert.equal((await falso('/api/admin/reviews')).status, 401);
+});
+
+test('segurança: origem externa não consegue alterar dados (CSRF) e JSON inválido não vaza detalhes', async () => {
+  const c = client();
+  const r = await c('/api/register', { method: 'POST', body: { name: 'Mal', phone: '11988887777', password: 'senha123' }, headers: { Origin: 'https://site-malicioso.example' } });
+  assert.equal(r.status, 403);
+  const j = await c('/api/login', { method: 'POST', raw: true, body: '{quebrado', headers: { 'Content-Type': 'application/json' } });
+  assert.equal(j.status, 400); assert.doesNotMatch(j.text, /SyntaxError|at /);
 });

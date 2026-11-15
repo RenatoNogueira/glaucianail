@@ -8,7 +8,8 @@
     "test": "node --test tests/",
     "import:pg": "node scripts/import-to-postgres.js",
     "schema": "node scripts/gen-schema-sql.js",
-    "icons": "node scripts/gen-icons.js"
+    "icons": "node scripts/gen-icons.js",
+    "headers": "node scripts/gen-vercel-headers.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
