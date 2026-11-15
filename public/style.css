@@ -601,3 +601,19 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
 .rva-dist b{display:block;height:100%;background:#f0a81c;border-radius:99px}
 .rva-cfg .chk{margin:0 0 8px}
 @media (max-width:760px){.rva-top{grid-template-columns:1fr}}
+
+/* ---------- Avaliações em carrossel ---------- */
+.rv-car{position:relative}
+.rv-car.on .rv-list{display:flex;grid-template-columns:none;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:4px 2px 6px}
+.rv-car.on .rv-list::-webkit-scrollbar{display:none}
+.rv-car.on .rv-item{flex:0 0 min(320px,82%);scroll-snap-align:start}
+@media (min-width:1100px){.rv-car.on .rv-item{flex-basis:calc((100% - 36px) / 4)}}
+.rv-nav{position:absolute;top:calc(50% - 22px);z-index:2;width:42px;height:42px;border-radius:50%;border:1px solid var(--glass-b,var(--line));background:var(--glass,var(--card));-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:var(--rose);font-size:1.6rem;line-height:1;cursor:pointer;box-shadow:var(--shadow);display:grid;place-items:center;padding:0 0 3px}
+.rv-nav[hidden]{display:none}
+.rv-nav.prev{left:-12px}.rv-nav.next{right:-12px}
+.rv-nav:hover{background:var(--rose);color:#fff}
+@media (max-width:640px){.rv-nav{display:none}}
+.rv-dots{display:flex;justify-content:center;gap:7px;margin-top:10px;flex-wrap:wrap}
+.rv-dots[hidden]{display:none}
+.rv-dots button{width:8px;height:8px;border-radius:99px;border:0;padding:0;background:var(--line);cursor:pointer;transition:width .25s,background .25s}
+.rv-dots button.on{width:24px;background:var(--rose)}

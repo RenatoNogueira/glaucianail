@@ -84,6 +84,35 @@ function initReveal() {
 // ---------- Avaliações com estrelas ----------
 const starsHtml = (n) => [1, 2, 3, 4, 5].map((i) => `<span class="${i <= Math.round(n) ? 'on' : ''}">★</span>`).join('');
 let rvNota = 0;
+// Com este número de comentários (ou mais), a lista vira carrossel automático
+const RV_CARROSSEL = 4;
+let rvTimer = null;
+function rvCarousel(n) {
+  const car = $('rvCar'), list = $('rvList'), on = n >= RV_CARROSSEL;
+  clearInterval(rvTimer);
+  car.classList.toggle('on', on);
+  $('rvPrev').hidden = $('rvNext').hidden = $('rvDots').hidden = !on;
+  list.scrollLeft = 0;
+  if (!on) return;
+  const itens = [...list.children];
+  $('rvDots').innerHTML = itens.map((_, i) => `<button type="button" data-i="${i}" aria-label="Ir para a avaliação ${i + 1}"></button>`).join('');
+  const passo = () => (itens[1] ? itens[1].offsetLeft - itens[0].offsetLeft : list.clientWidth);
+  const atual = () => Math.round(list.scrollLeft / passo());
+  const ir = (i) => list.scrollTo({ left: i * passo(), behavior: 'smooth' });
+  const fim = () => list.scrollLeft + list.clientWidth >= list.scrollWidth - 4;
+  const mark = () => { const a = atual(); $('rvDots').querySelectorAll('button').forEach((b, k) => b.classList.toggle('on', k === a)); };
+  const prox = () => (fim() ? ir(0) : ir(atual() + 1));
+  list.onscroll = mark; mark();
+  $('rvPrev').onclick = () => ir(Math.max(0, atual() - 1));
+  $('rvNext').onclick = prox;
+  $('rvDots').onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) ir(+b.dataset.i); };
+  const reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduz) return;
+  let pausa = false;
+  car.onmouseenter = car.onfocusin = car.ontouchstart = () => (pausa = true);
+  car.onmouseleave = car.onfocusout = () => (pausa = false);
+  rvTimer = setInterval(() => { if (!pausa && !document.hidden) prox(); }, 5000);
+}
 function rvPaint() {
   $('rvPick').querySelectorAll('button').forEach((b) => { const on = +b.dataset.n <= rvNota; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(+b.dataset.n === rvNota)); });
   $('rvMore').classList.toggle('hidden', !rvNota);
@@ -99,6 +128,7 @@ async function loadReviews() {
     $('rvAvgStars').innerHTML = starsHtml(r.media);
     $('rvCount').textContent = r.total ? `${r.total} ${r.total === 1 ? 'avaliação' : 'avaliações'}` : 'Seja a primeira a avaliar!';
     $('rvList').innerHTML = r.itens.map((i) => `<div class="rv-item"><div class="stars sm">${starsHtml(i.estrelas)}</div><p>${esc(i.texto)}</p><span class="small">${esc(i.nome)} · ${fmt(i.data)}</span></div>`).join('');
+    rvCarousel(r.itens.length);
     initReveal();
   } catch {}
 }

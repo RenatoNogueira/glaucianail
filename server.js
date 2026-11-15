@@ -525,7 +525,7 @@ function reviewStats() {
 app.get('/api/reviews', (req, res) => {
   const cfg = rvCfg();
   if (!cfg.exibir) return res.json({ exibir: false });
-  const itens = rvVisiveis().filter((r) => r.texto).slice(-6).reverse().map((r) => ({ nome: r.nome, estrelas: r.estrelas, texto: r.texto, data: r.data }));
+  const itens = rvVisiveis().filter((r) => r.texto).slice(-30).reverse().map((r) => ({ nome: r.nome, estrelas: r.estrelas, texto: r.texto, data: r.data }));
   res.json({ exibir: true, aberto: cfg.aberto, ...reviewStats(), itens });
 });
 app.post('/api/reviews', wrap(async (req, res) => {
