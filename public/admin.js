@@ -55,12 +55,33 @@ function view(v) {
 }
 const afterChange = () => loaders[cur]();
 
+// ---------- Paginação ----------
+// pager(elemento, estado{p}, total, tamanho, redesenhar): mostra "1–10 de 37" e os botões de página; clampa a página atual.
+const PAGES = { home: { p: 1 }, req: { p: 1 }, cli: { p: 1 } };
+function paginar(items, st, size) { // devolve só os itens da página atual (e corrige a página se a lista encolheu)
+  const n = Math.max(1, Math.ceil(items.length / size)); if (st.p > n) st.p = n; if (st.p < 1) st.p = 1;
+  return items.slice((st.p - 1) * size, st.p * size);
+}
+function pager(el, st, total, size, redraw) {
+  const n = Math.ceil(total / size);
+  if (n <= 1) { el.innerHTML = ''; el.onclick = null; return; }
+  const set = new Set([1, n, st.p - 1, st.p, st.p + 1]); if (st.p <= 2) { set.add(2); set.add(3); } if (st.p >= n - 1) { set.add(n - 1); set.add(n - 2); }
+  const nums = [...set].filter((x) => x >= 1 && x <= n).sort((a, b) => a - b);
+  let last = 0, btns = '';
+  for (const x of nums) { if (x - last > 1) btns += '<span class="pg-gap">…</span>'; btns += `<button type="button" class="pg ${x === st.p ? 'on' : ''}" data-p="${x}" ${x === st.p ? 'aria-current="page"' : ''} aria-label="Página ${x}">${x}</button>`; last = x; }
+  const a = (st.p - 1) * size + 1, b = Math.min(total, st.p * size);
+  el.innerHTML = `<span class="small pg-info">${a}–${b} de ${total}</span><nav class="pg-nav" aria-label="Paginação">
+    <button type="button" class="pg" data-p="${st.p - 1}" ${st.p === 1 ? 'disabled' : ''} aria-label="Página anterior">‹</button>${btns}
+    <button type="button" class="pg" data-p="${st.p + 1}" ${st.p === n ? 'disabled' : ''} aria-label="Próxima página">›</button></nav>`;
+  el.onclick = (e) => { const x = e.target.closest('[data-p]'); if (!x || x.disabled) return; st.p = +x.dataset.p; redraw(); };
+}
+
 // ---------- Filtro de data (Agendamentos) ----------
 const fcal = Calendar($('fcal'), { allowPast: true, marks: (iso) => apptDays[iso] || 0, onChange: (iso) => {
-  filterDate = iso; $('fbtn').textContent = '📅 ' + fmt(iso); $('fpanel').classList.add('hidden'); load();
+  filterDate = iso; PAGES.req.p = 1; $('fbtn').textContent = '📅 ' + fmt(iso); $('fpanel').classList.add('hidden'); load();
 } });
 $('fbtn').onclick = () => $('fpanel').classList.toggle('hidden');
-$('fclear').onclick = () => { filterDate = ''; fcal.setValue(null); $('fbtn').textContent = '📅 Todas as datas'; $('fpanel').classList.add('hidden'); load(); };
+$('fclear').onclick = () => { filterDate = ''; PAGES.req.p = 1; fcal.setValue(null); $('fbtn').textContent = '📅 Todas as datas'; $('fpanel').classList.add('hidden'); load(); };
 document.addEventListener('click', (e) => { if (!e.composedPath().includes($('fpop'))) $('fpanel').classList.add('hidden'); });
 
 // ---------- Agendamentos ----------
@@ -86,7 +107,7 @@ function wireAp(root, l) {
   root.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => {
     const a = l.find((x) => x.id == b.dataset.del);
     confirmDelete('Excluir agendamento?', `Agendamento de <strong>${esc(a.clienteNome)}</strong> (${esc(a.servicoNome)}, ${fmt(a.date)} às ${a.time}) será apagado${['pendente', 'aprovado'].includes(a.status) ? ' e o horário voltará a ficar livre' : ''}. A cliente não é avisada.`,
-      async () => { await api('/api/admin/appointments/' + a.id, 'DELETE'); afterChange(); });
+      async () => { await api('/api/admin/appointments/' + a.id, 'DELETE'); afterChange(); return 'Agendamento excluído'; });
   }));
   root.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => decide(b.dataset.a, b.dataset.s, l.find((x) => x.id == b.dataset.a))));
 }
@@ -102,14 +123,21 @@ async function loadHome() {
   const pend = all.filter((a) => a.status === 'pendente');
   $('homePend').innerHTML = pend.length ? pend.slice(0, 5).map(apRow).join('') + (pend.length > 5 ? `<p class="small" style="margin:10px 0 0">+ ${pend.length - 5} pedidos aguardando…</p>` : '')
     : '<div class="empty"><span class="big">🎉</span>Tudo em dia! Nenhum pedido aguardando.</div>';
-  const nx = all.filter((a) => a.status === 'aprovado' && a.date >= today).slice(0, 6);
-  $('homeNext').innerHTML = nx.length ? nx.map(apRow).join('') : '<div class="empty"><span class="big">🌸</span>Nenhum atendimento confirmado por enquanto.</div>';
-  wireAp($('homePend'), all); wireAp($('homeNext'), all);
+  homeAll = all; homeNx = all.filter((a) => a.status === 'aprovado' && a.date >= today);
+  wireAp($('homePend'), all); drawHomeNext();
+}
+let homeAll = [], homeNx = [];
+const HOME_SIZE = 5;
+function drawHomeNext() {
+  const pg = paginar(homeNx, PAGES.home, HOME_SIZE);
+  $('homeNext').innerHTML = homeNx.length ? pg.map(apRow).join('') : '<div class="empty"><span class="big">🌸</span>Nenhum atendimento confirmado por enquanto.</div>';
+  wireAp($('homeNext'), homeAll);
+  pager($('homeNextPg'), PAGES.home, homeNx.length, HOME_SIZE, drawHomeNext);
 }
 
 function renderTabs() {
   $('tabs').innerHTML = TABS.map(([v, l]) => `<button class="${v === status ? 'on' : ''}" data-s="${v}">${l}</button>`).join('');
-  $('tabs').querySelectorAll('button').forEach((b) => (b.onclick = () => { status = b.dataset.s; renderTabs(); load(); }));
+  $('tabs').querySelectorAll('button').forEach((b) => (b.onclick = () => { status = b.dataset.s; PAGES.req.p = 1; renderTabs(); load(); }));
 }
 
 async function load() {
@@ -118,8 +146,15 @@ async function load() {
   if (status) q.set('status', status);
   if (filterDate) q.set('date', filterDate);
   const [l] = await Promise.all([api('/api/admin/appointments?' + q), fetchAll()]);
-  $('list').innerHTML = l.length ? l.map(apRow).join('') : '<div class="empty"><span class="big">🌸</span>Nenhum agendamento aqui.</div>';
-  wireAp($('list'), l);
+  reqAll = l; drawReq();
+}
+let reqAll = [];
+const REQ_SIZE = 10;
+function drawReq() {
+  const pg = paginar(reqAll, PAGES.req, REQ_SIZE);
+  $('list').innerHTML = reqAll.length ? pg.map(apRow).join('') : '<div class="empty"><span class="big">🌸</span>Nenhum agendamento aqui.</div>';
+  wireAp($('list'), reqAll);
+  pager($('listPg'), PAGES.req, reqAll.length, REQ_SIZE, () => { drawReq(); $('list').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 }
 
 function decide(id, s, a) {
@@ -135,6 +170,7 @@ function decide(id, s, a) {
       try {
         const r = await api(`/api/admin/appointments/${id}/status`, 'POST', { status: s, message: $('msgx').value });
         close(); afterChange();
+        toast(ok ? 'Agendamento aprovado ✓' : 'Agendamento recusado', 'ok');
         if (r.whatsapp.enviado) toast('Mensagem enviada à cliente pelo WhatsApp ✓', 'ok');
         else modal({ title: 'Quase lá!', html: `<p>${ok ? 'Agendamento aprovado' : 'Agendamento recusado'}. Falta só enviar o aviso para <strong>${esc(a.clienteNome)}</strong>; a mensagem já está pronta.</p>`,
           actions: [{ label: 'Depois', cls: 'sec' }, { label: 'Enviar pelo WhatsApp', cls: 'wa', href: r.whatsapp.link, onClick: (c) => setTimeout(c, 100) }] });
@@ -204,7 +240,7 @@ async function loadServices() {
   $('servList').querySelectorAll('[data-x]').forEach((b) => (b.onclick = () => {
     const s = l.find((x) => x.id === b.dataset.x);
     confirmDelete('Excluir serviço?', `O serviço <strong>${esc(s.nome)}</strong> deixará de aparecer para as clientes. Agendamentos já feitos continuam no histórico. Para só ocultar, use "Editar" e desmarque "Ativo".`,
-      async () => { await api('/api/admin/services/' + s.id, 'DELETE'); loadServices(); });
+      async () => { await api('/api/admin/services/' + s.id, 'DELETE'); loadServices(); return 'Serviço excluído'; });
   }));
 }
 function serviceForm(s) {
@@ -261,15 +297,18 @@ function iconPicker() {
 
 // ---------- CRUD: Clientes ----------
 let clients = [];
+const CLI_SIZE = 8;
 async function loadClients() {
   $('cliList').innerHTML = skeleton(2);
   clients = await api('/api/admin/clients');
   renderClients();
 }
 function renderClients() {
-  const q = $('cliQ').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+  const q = $('cliQ').value.trim().toLowerCase(), qd = /[a-zà-ú]/i.test(q) ? '' : q.replace(/\D/g, ''); // com letras, busca só no nome
   const l = clients.filter((c) => !q || c.name.toLowerCase().includes(q) || (qd && c.phone.includes(qd)));
-  $('cliList').innerHTML = l.length ? l.map((c) => `
+  const pg = paginar(l, PAGES.cli, CLI_SIZE);
+  pager($('cliPg'), PAGES.cli, l.length, CLI_SIZE, renderClients);
+  $('cliList').innerHTML = l.length ? pg.map((c) => `
     <div class="ap"><span class="tk-ic">👤</span>
       <div class="info"><strong>${esc(c.name)}</strong><span class="small">📱 +${esc(c.phone)} · ${c.agendamentos} agendamento(s)${c.ativos ? `, ${c.ativos} ativo(s)` : ''}</span></div>
       <div class="apbtns"><button class="btn sec sm" data-e="${c.id}">Editar</button><button class="btn bad sm" data-x="${c.id}">Excluir</button></div></div>`).join('')
@@ -278,10 +317,10 @@ function renderClients() {
   $('cliList').querySelectorAll('[data-x]').forEach((b) => (b.onclick = () => {
     const c = clients.find((x) => x.id == b.dataset.x);
     confirmDelete('Excluir cliente?', `<strong>${esc(c.name)}</strong> e todos os seus ${c.agendamentos} agendamento(s) serão removidos${c.ativos ? `, liberando ${c.ativos} horário(s) reservado(s)` : ''}.`,
-      async () => { await api('/api/admin/clients/' + c.id, 'DELETE'); loadClients(); });
+      async () => { await api('/api/admin/clients/' + c.id, 'DELETE'); loadClients(); return 'Cliente excluída'; });
   }));
 }
-$('cliQ').oninput = renderClients;
+$('cliQ').oninput = () => { PAGES.cli.p = 1; renderClients(); };
 function clientForm(c) {
   modal({
     title: 'Editar cliente',
@@ -584,12 +623,15 @@ async function renderDay(date) {
       <select id="dI" aria-label="Intervalo"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 hora</option><option value="90">1h30</option><option value="120">2 horas</option></select></div>
     <div class="row" style="margin-top:8px"><button type="button" class="btn sec sm" id="dGen">Gerar faixa</button><button type="button" class="btn bad sm" id="dClr">Limpar livres do dia</button></div>`;
   const done = (msg) => { if (msg) toast(msg, 'ok'); renderDay(date); loadSlots(); };
+  const horaDe = (id) => (l.find((x) => String(x.id) === String(id)) || {}).time || '';
   const fail = (err) => toast(err.message, 'err');
-  body.querySelectorAll('.x').forEach((b) => (b.onclick = () => api('/api/admin/slots/' + b.dataset.id, 'DELETE').then(() => done()).catch(fail)));
-  $('dAdd').onclick = () => api('/api/admin/slots/single', 'POST', { date, time: $('dTime').value }).then(() => done()).catch(fail);
+  body.querySelectorAll('.x').forEach((b) => (b.onclick = () => confirmDelete('Excluir horário?', `O horário das <strong>${horaDe(b.dataset.id)}</strong> de ${fmt(date)} deixará de aparecer para as clientes.`,
+    async () => { await api('/api/admin/slots/' + b.dataset.id, 'DELETE'); done(); return `Horário ${horaDe(b.dataset.id)} excluído`; })));
+  $('dAdd').onclick = () => api('/api/admin/slots/single', 'POST', { date, time: $('dTime').value }).then(() => done(`Horário ${$('dTime').value} adicionado`)).catch(fail);
   $('dGen').onclick = () => api('/api/admin/slots/bulk', 'POST', { from: date, to: date, interval: $('dI').value, schedule: { [new Date(date + 'T12:00:00').getDay()]: [{ start: $('dS').value, end: $('dE').value }] } })
     .then((r) => done(`${r.adicionados} horários adicionados`)).catch(fail);
-  $('dClr').onclick = () => api('/api/admin/slots/clear-day', 'POST', { date }).then((r) => done(`${r.removidos} horários removidos`)).catch(fail);
+  $('dClr').onclick = () => confirmDelete('Limpar horários livres do dia?', `Todos os horários <strong>livres</strong> de ${fmt(date)} serão removidos. Horários reservados nunca são apagados.`,
+    async () => { const r = await api('/api/admin/slots/clear-day', 'POST', { date }); done(); return `${r.removidos} ${r.removidos === 1 ? 'horário removido' : 'horários removidos'}`; });
 }
 
 // ---------- Página inicial: editar os textos ----------
@@ -715,3 +757,6 @@ async function init() {
   if (me.admin) { renderTabs(); renderWeek(); preview(); view(cur); }
 }
 init();
+
+// Aviso ao gerar o backup
+document.addEventListener('click', (e) => { if (e.target.closest('a[href="/api/admin/backup"]')) toast('Backup gerado — guarde em local seguro ✓', 'ok'); });

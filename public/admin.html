@@ -60,7 +60,7 @@
       <div id="v-home">
         <div class="stats" id="stats"></div>
         <div class="card"><div class="toolbar"><h2>⏳ Aguardando aprovação</h2><button class="link" data-go="req">Ver todos →</button></div><div id="homePend"></div></div>
-        <div class="card"><div class="toolbar"><h2>📅 Próximos atendimentos</h2><button class="link" data-go="agenda">Ver agenda →</button></div><div id="homeNext"></div></div>
+        <div class="card"><div class="toolbar"><h2>📅 Próximos atendimentos</h2><button class="link" data-go="agenda">Ver agenda →</button></div><div id="homeNext"></div><div class="pager" id="homeNextPg"></div></div>
       </div>
 
       <!-- Agendamentos -->
@@ -68,6 +68,7 @@
         <div class="card">
           <div class="toolbar"><div class="nav" id="tabs"></div><div class="pop" id="fpop"><button type="button" class="btn sec sm" id="fbtn">📅 Todas as datas</button><div class="pop-panel hidden" id="fpanel"><div id="fcal"></div><div class="row" style="margin-top:10px"><button type="button" class="btn sec sm" id="fclear">Limpar filtro</button></div></div></div></div>
           <div id="list"></div>
+          <div class="pager" id="listPg"></div>
         </div>
       </div>
 
@@ -152,7 +153,7 @@
       <div id="v-serv" class="hidden"><div class="card"><div id="servList"></div></div></div>
 
       <!-- Clientes -->
-      <div id="v-cli" class="hidden"><div class="card"><input id="cliQ" placeholder="🔎 Buscar por nome ou WhatsApp" style="margin-bottom:8px"><div id="cliList"></div></div></div>
+      <div id="v-cli" class="hidden"><div class="card"><input id="cliQ" placeholder="🔎 Buscar por nome ou WhatsApp" style="margin-bottom:8px"><div id="cliList"></div><div class="pager" id="cliPg"></div></div></div>
 
       <!-- Página inicial -->
       <!-- Avaliações -->

@@ -683,3 +683,14 @@ body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16
 /* Evita o "piscar" do ícone/nome padrão antes de a marca real carregar */
 html:not(.brand-ready) [data-brand-logo],html:not(.brand-ready) [data-brand-name]{visibility:hidden}
 [data-brand-logo],[data-brand-name]{transition:opacity .25s}
+
+/* ---------- Paginação (admin) ---------- */
+.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px}
+.pager:empty{display:none}
+.pg-nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pg{min-width:36px;height:36px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:600;cursor:pointer;transition:.15s}
+.pg:hover:not(:disabled):not(.on){border-color:var(--rose);color:var(--rose)}
+.pg.on{background:var(--rose);border-color:var(--rose);color:var(--on,#fff)}
+.pg:disabled{opacity:.4;cursor:not-allowed}
+.pg-gap{padding:0 2px;color:var(--muted)}
+@media (max-width:520px){.pager{justify-content:center}.pg{min-width:34px;height:34px}}
