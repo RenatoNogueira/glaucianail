@@ -576,3 +576,19 @@ img,video,svg{max-width:100%}
 @media (max-width:859px){.landing .lp-hero::before{background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 88%,transparent) 0%,color-mix(in srgb,var(--bg) 70%,transparent) 55%,color-mix(in srgb,var(--bg) 40%,transparent) 100%),url(/hero.webp) 75% center/cover no-repeat}}
 .landing .lp-hero .auth-card{background:color-mix(in srgb,var(--card) 62%,transparent)}
 @media (prefers-reduced-motion:reduce){.landing .lp-hero::before{animation:none}}
+
+/* ---------- Página inicial em largura total (telas grandes) ---------- */
+main:has(.landing:not(.hidden)){max-width:none;padding-left:clamp(16px,4vw,80px);padding-right:clamp(16px,4vw,80px)}
+body:has(.landing:not(.hidden)) .topbar>div{max-width:none;padding-left:clamp(16px,4vw,80px);padding-right:clamp(16px,4vw,80px)}
+@media (min-width:1100px){
+  .landing .lp-hero{min-height:min(620px,72vh);padding:72px clamp(44px,6vw,110px);grid-template-columns:1.2fr .8fr;gap:clamp(48px,6vw,120px)}
+  .landing .lp-copy h1{font-size:clamp(3rem,4.2vw,4.6rem)}
+  .landing .lp-sub{font-size:1.2rem;max-width:34em}
+  .landing .auth-card{max-width:460px;justify-self:end;width:100%}
+  .landing .lp-sec{margin-top:72px}
+  .landing .lp-head h2{font-size:2rem}
+  .lp-svcs{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .lp-steps{grid-template-columns:repeat(3,1fr)}
+  .rv-wrap{grid-template-columns:260px 1fr}
+  .rv-list{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+}
