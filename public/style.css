@@ -759,3 +759,15 @@ html:not(.brand-ready) [data-brand-logo],html:not(.brand-ready) [data-brand-name
   .dash-kpis .stat small{font-size:.74rem}
   .dash-kpis .stat em{font-size:.68rem}
 }
+
+/* Abas de Agendamentos: compactas, em uma linha, com rolagem lateral quando faltar espaço */
+#tabs{flex-wrap:nowrap;gap:4px;margin-bottom:0;min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px}
+#tabs::-webkit-scrollbar{display:none}
+#tabs button{flex:0 0 auto;white-space:nowrap;padding:7px 13px;font-size:.84rem;line-height:1.2}
+#tabs button:hover:not(.on){background:var(--blush);color:var(--rose-d)}
+#v-req .toolbar{flex-wrap:wrap;gap:10px;align-items:center}
+#v-req .toolbar>.nav{flex:1 1 100%}
+@media (min-width:1200px){#v-req .toolbar>.nav{flex:1 1 0}}
+#tabs{flex-wrap:wrap;overflow:visible;gap:5px}
+#tabs button{padding:6px 12px;font-size:.82rem;border:1px solid var(--line)}
+#tabs button.on{border-color:var(--ink)}
