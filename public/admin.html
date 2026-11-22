@@ -58,7 +58,17 @@
 
       <!-- Visão geral -->
       <div id="v-home">
-        <div class="stats" id="stats"></div>
+        <div class="dash-top"><div class="chips" id="dashPer" role="group" aria-label="Período"></div><span class="small" id="dashRange"></span></div>
+        <div class="stats dash-kpis" id="stats"></div>
+        <div class="dash-grid">
+          <div class="card dg-wide"><h2>📈 Receita <span class="small" style="font-weight:400">(recebido, por data do atendimento)</span></h2><div id="dashRev"></div></div>
+          <div class="card"><h2>💳 Pagamentos</h2><div id="dashPay"></div></div>
+          <div class="card"><h2>📋 Situação dos agendamentos</h2><div id="dashStatus"></div></div>
+          <div class="card"><h2>💅 Serviços mais feitos</h2><div id="dashSvc"></div></div>
+          <div class="card"><h2>📆 Dias da semana</h2><div id="dashDow"></div></div>
+          <div class="card"><h2>👑 Melhores clientes</h2><div id="dashCli"></div></div>
+        </div>
+        <div class="card"><div class="toolbar"><h2>🧾 Atendidas com pagamento pendente</h2><button class="link" data-go="req" id="goPay">Ver todos →</button></div><div id="homePay"></div></div>
         <div class="card"><div class="toolbar"><h2>⏳ Aguardando aprovação</h2><button class="link" data-go="req">Ver todos →</button></div><div id="homePend"></div></div>
         <div class="card"><div class="toolbar"><h2>📅 Próximos atendimentos</h2><button class="link" data-go="agenda">Ver agenda →</button></div><div id="homeNext"></div><div class="pager" id="homeNextPg"></div></div>
       </div>
@@ -197,4 +207,4 @@
   <nav class="tabbar" id="tabbar" aria-label="Menu"></nav>
 </div>
 
-<script src="ui.js"></script><script src="admin.js"></script></body></html>
+<script src="ui.js"></script><script src="dash.js"></script><script src="admin.js"></script></body></html>

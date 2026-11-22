@@ -6,7 +6,7 @@ const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const fmt = (s) => s.split('-').reverse().join('/');
 const dateBlock = (s) => `<div class="date-blk"><strong>${s.slice(8)}</strong><small>${MESES[+s.slice(5, 7) - 1]}</small></div>`;
 const ISO = (d) => d.toLocaleDateString('sv-SE');
-const STATUS_LABEL = { pendente: '⏳ Aguardando', aprovado: '✓ Confirmado', recusado: '✕ Recusado', cancelado: 'Cancelado' };
+const STATUS_LABEL = { pendente: '⏳ Aguardando', aprovado: '✓ Confirmado', concluido: '✅ Concluído', nao_compareceu: '🚫 Não compareceu', recusado: '✕ Recusado', cancelado: 'Cancelado' };
 const chipSt = (s) => `<span class="chipst ${s}">${STATUS_LABEL[s] || s}</span>`;
 
 async function api(url, method = 'GET', body) {

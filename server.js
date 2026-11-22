@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const { createStore } = require('./lib/store');
 const { createSessions, createLimiter } = require('./lib/session');
 const security = require('./lib/security');
+const fin = require('./lib/finance');
 
 // --- .env local (na Vercel as variáveis vêm do painel do projeto) ---
 try {
@@ -97,6 +98,8 @@ function waMessage(a, status, extra) {
     return `Olá, ${nome}! ✅ Seu agendamento de *${a.servicoNome}* em *${quando}* foi *CONFIRMADO* no ${getStudio()}. Te esperamos! 💅${extra ? '\n' + extra : ''}`;
   if (status === 'recusado')
     return `Olá, ${nome}! Infelizmente não conseguimos atender seu pedido de *${a.servicoNome}* em *${quando}*. 😔${extra ? '\n' + extra : ''}\nPode escolher outro horário pelo nosso sistema?`;
+  if (status === 'cancelado')
+    return `Olá, ${nome}! Precisamos cancelar seu agendamento de *${a.servicoNome}* em *${quando}* no ${getStudio()}. 😔${extra ? '\n' + extra : ''}\nPode escolher outro horário pelo nosso sistema?`;
   return `Olá, ${nome}! Sobre seu agendamento de ${a.servicoNome} em ${quando}.${extra ? '\n' + extra : ''}`;
 }
 
@@ -306,13 +309,72 @@ app.post('/api/admin/login', wrap(async (req, res) => {
 
 app.post('/api/admin/logout', (req, res) => { req.session.admin = false; res.saveSession(); res.json({ ok: true }); });
 
+const waLinkOf = (e) => `https://wa.me/${e.clienteTel}?text=${encodeURIComponent(waMessage(e, e.status))}`;
+const enriched = () => db.appointments.map((a) => fin.enrich(a, db.settings));
+// filtros: status (bruto), estado (inclui concluido/nao_compareceu), pagamento=pendente, date
 app.get('/api/admin/appointments', needAdmin, (req, res) => {
-  let list = db.appointments;
-  if (req.query.status) list = list.filter((a) => a.status === req.query.status);
-  if (req.query.date) list = list.filter((a) => a.date === req.query.date);
+  const { status, estado, pagamento, date } = req.query;
+  let list = enriched();
+  if (typeof status === 'string' && status) list = list.filter((a) => a.status === status);
+  if (typeof estado === 'string' && estado) list = list.filter((a) => a.estado === estado);
+  if (pagamento === 'pendente') list = list.filter(fin.pendentePagamento);
+  if (typeof date === 'string' && date) list = list.filter((a) => a.date === date);
   list = [...list].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  res.json(list.map((a) => ({ ...a, waLink: `https://wa.me/${a.clienteTel}?text=${encodeURIComponent(waMessage(a, a.status))}` })));
+  res.json(list.map((a) => ({ ...a, waLink: waLinkOf(a) })));
 });
+
+// ----- Dashboard -----
+app.get('/api/admin/dashboard', needAdmin, (req, res) => res.json(fin.buildDashboard(enriched(), String(req.query.periodo || '30'), todayStr())));
+
+// ----- Desfecho do atendimento: concluído / não compareceu (só depois que o horário começou) -----
+app.post('/api/admin/appointments/:id/outcome', needAdmin, wrap(async (req, res) => {
+  const a = db.appointments.find((x) => x.id === +req.params.id);
+  if (!a) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+  const { resultado } = req.body || {};
+  const f = (db.settings.fin = db.settings.fin || {});
+  if (resultado === null) { // reabrir: volta a "confirmado"
+    if (f[a.id]) { delete f[a.id].resultado; delete f[a.id].resultadoEm; }
+  } else {
+    if (!fin.RESULTADOS.includes(resultado)) return res.status(400).json({ erro: 'Resultado inválido.' });
+    if (a.status !== 'aprovado') return res.status(409).json({ erro: 'Só agendamentos confirmados podem ser marcados como concluídos ou não comparecimento.' });
+    if (isFuture(a.date, a.time)) return res.status(409).json({ erro: 'Este atendimento ainda não aconteceu. Marque depois do horário.' });
+    f[a.id] = { ...(f[a.id] || {}), resultado, resultadoEm: new Date().toISOString() };
+  }
+  a.atualizadoEm = new Date().toISOString();
+  await save();
+  res.json({ ...fin.enrich(a, db.settings), waLink: waLinkOf(a) });
+}));
+
+// ----- Pagamento: nenhum / sinal de 50% / total (100%) -----
+app.post('/api/admin/appointments/:id/payment', needAdmin, wrap(async (req, res) => {
+  const a = db.appointments.find((x) => x.id === +req.params.id);
+  if (!a) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+  const { tipo, forma } = req.body || {};
+  if (!['nenhum', 'sinal', 'total'].includes(tipo)) return res.status(400).json({ erro: 'Escolha 50%, 100% ou sem pagamento.' });
+  if (tipo !== 'nenhum' && !['pendente', 'aprovado'].includes(a.status)) return res.status(409).json({ erro: 'Só agendamentos pendentes ou confirmados recebem pagamento.' });
+  if (tipo !== 'nenhum' && !fin.FORMAS.includes(forma)) return res.status(400).json({ erro: 'Informe a forma de pagamento (Pix, dinheiro, cartão ou outro).' });
+  const f = (db.settings.fin = db.settings.fin || {});
+  const atual = f[a.id] || {};
+  if (tipo === 'nenhum') { delete atual.pago; delete atual.forma; delete atual.pagoEm; }
+  else { atual.pago = fin.valorDoTipo(tipo, a.preco); atual.forma = forma; atual.pagoEm = new Date().toISOString(); }
+  if (Object.keys(atual).length) f[a.id] = atual; else delete f[a.id];
+  a.atualizadoEm = new Date().toISOString();
+  await save();
+  res.json({ ...fin.enrich(a, db.settings), waLink: waLinkOf(a) });
+}));
+
+// ----- Cancelamento feito pela admin (libera o horário) -----
+app.post('/api/admin/appointments/:id/cancel', needAdmin, wrap(async (req, res) => {
+  const a = db.appointments.find((x) => x.id === +req.params.id);
+  if (!a) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+  if (!ACTIVE.includes(a.status)) return res.status(409).json({ erro: 'Este agendamento não pode ser cancelado.' });
+  if (fin.enrich(a, db.settings).estado !== 'aprovado' && a.status === 'aprovado') return res.status(409).json({ erro: 'Este atendimento já foi concluído ou marcado como não comparecimento. Reabra-o antes de cancelar.' });
+  a.status = 'cancelado'; a.atualizadoEm = new Date().toISOString();
+  await save();
+  const text = waMessage(a, 'cancelado', String((req.body || {}).message || '').slice(0, 300));
+  const envio = await sendWhatsApp(a.clienteTel, text);
+  res.json({ agendamento: fin.enrich(a, db.settings), whatsapp: { ...envio, link: `https://wa.me/${a.clienteTel}?text=${encodeURIComponent(text)}` } });
+}));
 
 app.post('/api/admin/appointments/:id/status', needAdmin, wrap(async (req, res) => {
   const { status, message } = req.body || {};
@@ -332,7 +394,9 @@ app.post('/api/admin/appointments/:id/status', needAdmin, wrap(async (req, res) 
 app.delete('/api/admin/appointments/:id', needAdmin, wrap(async (req, res) => {
   const i = db.appointments.findIndex((x) => x.id === +req.params.id);
   if (i < 0) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+  const apId = db.appointments[i].id;
   db.appointments.splice(i, 1); // se estava ativo, o horário volta a ficar livre
+  if (db.settings.fin) delete db.settings.fin[apId];
   await save();
   res.json({ ok: true });
 }));
@@ -492,7 +556,9 @@ app.delete('/api/admin/clients/:id', needAdmin, wrap(async (req, res) => {
   if (i < 0) return res.status(404).json({ erro: 'Cliente não encontrada.' });
   const id = db.users[i].id;
   db.users.splice(i, 1);
+  const sumir = db.appointments.filter((a) => a.userId === id).map((a) => a.id);
   db.appointments = db.appointments.filter((a) => a.userId !== id); // remove também o histórico dela
+  if (db.settings.fin) sumir.forEach((x) => delete db.settings.fin[x]);
   await save();
   res.json({ ok: true });
 }));

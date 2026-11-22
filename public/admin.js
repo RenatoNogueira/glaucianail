@@ -1,5 +1,5 @@
 let status = 'pendente', filterDate = '', apptDays = {}, pubDays = {}, pending = 0, cur = 'home';
-const TABS = [['pendente', 'Pendentes'], ['aprovado', 'Aprovados'], ['recusado', 'Recusados'], ['cancelado', 'Cancelados'], ['', 'Todos']];
+const TABS = [['pendente', 'Pendentes'], ['aprovado', 'Confirmados'], ['concluido', 'Concluídos'], ['nao_compareceu', 'Não compareceu'], ['cancelado', 'Cancelados'], ['recusado', 'Recusados'], ['pagpend', 'A receber'], ['', 'Todos']];
 
 // ---------- Login ----------
 $('eye').onclick = () => {
@@ -22,7 +22,7 @@ $('logout').onclick = $('logoutM').onclick = doLogout;
 
 // ---------- Navegação (menu lateral no computador, barra inferior no celular) ----------
 const NAV = [
-  ['home', '🏠', 'Visão geral', 'Resumo do seu dia', 'Início'],
+  ['home', '📊', 'Dashboard', 'Seu estúdio em números', 'Início'],
   ['req', '📋', 'Agendamentos', 'Aprove, recuse e acompanhe os pedidos', 'Pedidos'],
   ['agenda', '🗓️', 'Agenda', 'Defina os dias e horários de atendimento', 'Agenda'],
   ['serv', '💅', 'Serviços', 'Cadastre serviços, preços e duração', 'Serviços'],
@@ -94,11 +94,12 @@ async function fetchAll() {
 
 const apRow = (a) => `
   <div class="ap">${dateBlock(a.date)}
-    <div class="info"><strong>${esc(a.clienteNome)} ${chipSt(a.status)}</strong>
+    <div class="info"><strong>${esc(a.clienteNome)} ${chipSt(a.estado || a.status)} ${payChip(a)}</strong>
       <span class="small">${esc(a.servicoNome)} · ${a.time} · R$ ${a.preco}<br>📱 +${esc(a.clienteTel)}</span>
       ${a.notes ? `<div class="note">💬 ${esc(a.notes)}</div>` : ''}</div>
     <div class="apbtns">
       ${a.status === 'pendente' ? `<button class="btn ok sm" data-a="${a.id}" data-s="aprovado">Aprovar</button><button class="btn bad sm" data-a="${a.id}" data-s="recusado">Recusar</button>` : ''}
+      ${finButtons(a)}
       <a class="btn sec sm" target="_blank" rel="noopener" href="${esc(a.waLink)}" aria-label="Abrir conversa no WhatsApp">WhatsApp</a>
       <button class="btn bad sm" data-del="${a.id}" aria-label="Excluir agendamento">🗑</button>
     </div></div>`;
@@ -110,21 +111,20 @@ function wireAp(root, l) {
       async () => { await api('/api/admin/appointments/' + a.id, 'DELETE'); afterChange(); return 'Agendamento excluído'; });
   }));
   root.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => decide(b.dataset.a, b.dataset.s, l.find((x) => x.id == b.dataset.a))));
+  wireFin(root, l);
 }
 
 async function loadHome() {
-  const all = await fetchAll(), today = ISO(new Date()), c = (f) => all.filter(f).length;
-  const nPend = c((a) => a.status === 'pendente');
-  $('stats').innerHTML = `
-    <div class="stat ${nPend ? 'hl' : ''}"><small>Aguardando aprovação</small><strong>${nPend}</strong></div>
-    <div class="stat"><small>Atendimentos hoje</small><strong>${c((a) => a.date === today && a.status === 'aprovado')}</strong></div>
-    <div class="stat"><small>Confirmados (futuros)</small><strong>${c((a) => a.date >= today && a.status === 'aprovado')}</strong></div>
-    <div class="stat"><small>Total de pedidos</small><strong>${all.length}</strong></div>`;
+  const [all] = await Promise.all([fetchAll(), loadDash()]), today = ISO(new Date());
   const pend = all.filter((a) => a.status === 'pendente');
   $('homePend').innerHTML = pend.length ? pend.slice(0, 5).map(apRow).join('') + (pend.length > 5 ? `<p class="small" style="margin:10px 0 0">+ ${pend.length - 5} pedidos aguardando…</p>` : '')
     : '<div class="empty"><span class="big">🎉</span>Tudo em dia! Nenhum pedido aguardando.</div>';
-  homeAll = all; homeNx = all.filter((a) => a.status === 'aprovado' && a.date >= today);
-  wireAp($('homePend'), all); drawHomeNext();
+  // atendimentos já feitos com valor em aberto (os mais antigos primeiro)
+  const dev = all.filter((a) => a.estado === 'concluido' && a.restante > 0).sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+  $('homePay').innerHTML = dev.length ? dev.slice(0, 5).map(apRow).join('') + (dev.length > 5 ? `<p class="small" style="margin:10px 0 0">+ ${dev.length - 5} atendimento(s) com pagamento pendente…</p>` : '')
+    : '<div class="empty"><span class="big">💚</span>Nenhum pagamento pendente dos atendimentos concluídos.</div>';
+  homeAll = all; homeNx = all.filter((a) => a.estado === 'aprovado' && a.date >= today);
+  wireAp($('homePend'), all); wireAp($('homePay'), all); drawHomeNext();
 }
 let homeAll = [], homeNx = [];
 const HOME_SIZE = 5;
@@ -143,7 +143,7 @@ function renderTabs() {
 async function load() {
   $('list').innerHTML = skeleton();
   const q = new URLSearchParams();
-  if (status) q.set('status', status);
+  if (status === 'pagpend') q.set('pagamento', 'pendente'); else if (status) q.set('estado', status);
   if (filterDate) q.set('date', filterDate);
   const [l] = await Promise.all([api('/api/admin/appointments?' + q), fetchAll()]);
   reqAll = l; drawReq();
@@ -760,3 +760,6 @@ init();
 
 // Aviso ao gerar o backup
 document.addEventListener('click', (e) => { if (e.target.closest('a[href="/api/admin/backup"]')) toast('Backup gerado — guarde em local seguro ✓', 'ok'); });
+
+// "Ver todos" dos pagamentos pendentes abre a aba "A receber" em Agendamentos
+$('goPay').addEventListener('click', () => { status = 'pagpend'; PAGES.req.p = 1; renderTabs(); });

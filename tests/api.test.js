@@ -531,3 +531,106 @@ test('segurança: origem externa não consegue alterar dados (CSRF) e JSON invá
   const j = await c('/api/login', { method: 'POST', raw: true, body: '{quebrado', headers: { 'Content-Type': 'application/json' } });
   assert.equal(j.status, 400); assert.doesNotMatch(j.text, /SyntaxError|at /);
 });
+
+// ---------- Concluído / não compareceu / pagamentos / Dashboard ----------
+test('finanças: enrich calcula estado, pago, restante e tipo de pagamento', () => {
+  const fin = require('../lib/finance');
+  const ap = { id: 5, status: 'aprovado', preco: 80 };
+  const set = (f) => ({ fin: { 5: f } });
+  assert.deepEqual(['estado', 'pagamento', 'pago', 'restante'].map((k) => fin.enrich(ap, {})[k]), ['aprovado', 'nenhum', 0, 80]);
+  assert.deepEqual(['estado', 'pagamento', 'pago', 'restante'].map((k) => fin.enrich(ap, set({ resultado: 'concluido', pago: 40 }))[k]), ['concluido', 'sinal', 40, 40]);
+  assert.equal(fin.enrich(ap, set({ pago: 80 })).pagamento, 'total');
+  assert.equal(fin.enrich(ap, set({ pago: 999 })).restante, 0, 'nunca fica negativo');
+  assert.equal(fin.enrich({ ...ap, status: 'cancelado' }, set({ resultado: 'concluido' })).estado, 'cancelado', 'desfecho só vale para aprovados');
+  assert.equal(fin.valorDoTipo('sinal', 35), 17.5); assert.equal(fin.valorDoTipo('total', 35), 35); assert.equal(fin.valorDoTipo('nenhum', 35), 0);
+});
+
+test('finanças: Dashboard soma recebido, a receber, comparecimento e agrupa por serviço', () => {
+  const fin = require('../lib/finance');
+  const set = { fin: { 1: { resultado: 'concluido', pago: 35 }, 2: { resultado: 'concluido', pago: 20 }, 3: { resultado: 'nao_compareceu' }, 4: { pago: 17.5 } } };
+  const mk = (id, status, date, preco, nome = 'Manicure') => ({ id, status, date, time: '10:00', preco, servicoNome: nome, clienteNome: 'Ana', clienteTel: '5511900000000' });
+  const lista = [mk(1, 'aprovado', '2026-11-10', 35), mk(2, 'aprovado', '2026-11-11', 40, 'Pé'), mk(3, 'aprovado', '2026-11-12', 35), mk(4, 'aprovado', '2026-11-25', 35),
+    mk(5, 'cancelado', '2026-11-13', 35), mk(6, 'pendente', '2026-11-26', 35), mk(7, 'recusado', '2026-10-01', 35)].map((a) => fin.enrich(a, set));
+  const d = fin.buildDashboard(lista, 'mes', '2026-11-22'), k = d.kpis;
+  assert.equal(k.total, 6, 'outubro fica de fora do período "mês"');
+  assert.equal(k.receita, 72.5); assert.equal(k.aReceber, 20); assert.equal(k.aReceberQtd, 1); assert.equal(k.previsto, 17.5);
+  assert.deepEqual([k.concluidos, k.naoCompareceu, k.cancelados, k.pendentes, k.confirmados], [2, 1, 1, 1, 1]);
+  assert.equal(k.comparecimento, 67); assert.equal(k.ticketMedio, 27.5);
+  assert.deepEqual(d.pagamentos.map((p) => p.qtd), [1, 2, 0], 'total / sinal / nenhum (não comparecimento não conta)');
+  assert.equal(d.serie.length, 30); assert.equal(d.serie.find((s) => s.k === '2026-11-10').receita, 35);
+  assert.equal(d.porServico[0].nome, 'Manicure');
+  assert.equal(fin.buildDashboard([], 'tudo', '2026-11-22').serie.length, 0, 'sem dados não quebra');
+  assert.equal(fin.buildDashboard(lista, 'periodo-invalido', '2026-11-22').periodo, '30', 'período inválido vira 30 dias');
+});
+
+test('finanças API: pagamento 50%/100%, cancelamento pela admin e regras do desfecho', async () => {
+  const adm = client(); await adm('/api/admin/login', { method: 'POST', body: ADMIN, headers: { 'X-Forwarded-For': '5.4.3.2' } });
+  const slotDia = iso(addDays(50));
+  await adm('/api/admin/slots/bulk', { method: 'POST', body: { dates: [slotDia], interval: 60, schedule: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, [{ start: '09:00', end: '09:00' }]])) } });
+  const { c } = await novoCliente(77);
+  const cfg = (await c('/api/config')).json;
+  const ap = (await c('/api/appointments', { method: 'POST', body: { service: cfg.servicos[0].id, date: slotDia, time: '09:00' } })).json;
+  const preco = ap.preco;
+  const pg = (tipo, forma = 'pix') => adm(`/api/admin/appointments/${ap.id}/payment`, { method: 'POST', body: { tipo, forma } });
+  assert.equal((await pg('metade')).status, 400, 'tipo inválido');
+  assert.equal((await pg('sinal', 'bitcoin')).status, 400, 'forma inválida');
+  assert.equal((await c(`/api/admin/appointments/${ap.id}/payment`, { method: 'POST', body: { tipo: 'total', forma: 'pix' } })).status, 401, 'só a admin');
+  let r = (await pg('sinal')).json; assert.deepEqual([r.pagamento, r.pago, r.restante], ['sinal', preco / 2, preco / 2]);
+  r = (await pg('total', 'dinheiro')).json; assert.deepEqual([r.pagamento, r.pago, r.restante, r.forma], ['total', preco, 0, 'dinheiro']);
+  r = (await pg('nenhum')).json; assert.deepEqual([r.pagamento, r.pago], ['nenhum', 0]);
+  // desfecho: ainda é futuro e precisa estar aprovado
+  assert.equal((await adm(`/api/admin/appointments/${ap.id}/outcome`, { method: 'POST', body: { resultado: 'concluido' } })).status, 409, 'pendente não conclui');
+  await adm(`/api/admin/appointments/${ap.id}/status`, { method: 'POST', body: { status: 'aprovado' } });
+  assert.equal((await adm(`/api/admin/appointments/${ap.id}/outcome`, { method: 'POST', body: { resultado: 'concluido' } })).status, 409, 'futuro não conclui');
+  assert.equal((await adm(`/api/admin/appointments/${ap.id}/outcome`, { method: 'POST', body: { resultado: 'xyz' } })).status, 400);
+  // filtros e Dashboard
+  await pg('sinal');
+  assert.equal((await adm('/api/admin/appointments?pagamento=pendente')).json.some((x) => x.id === ap.id), true);
+  assert.equal((await adm('/api/admin/appointments?estado=aprovado')).json.some((x) => x.id === ap.id), true);
+  const d = (await adm('/api/admin/dashboard?periodo=tudo')).json; assert.ok(d.kpis.receita >= preco / 2 && d.kpis.previsto >= preco / 2);
+  assert.equal((await c('/api/admin/dashboard')).status, 401);
+  // cancelamento pela admin libera o horário
+  r = await adm(`/api/admin/appointments/${ap.id}/cancel`, { method: 'POST', body: { message: 'Imprevisto' } });
+  assert.equal(r.status, 200); assert.equal(r.json.agendamento.estado, 'cancelado'); assert.match(r.json.whatsapp.link, /cancelar/);
+  assert.ok((await c('/api/slots?date=' + slotDia)).json.includes('09:00'), 'horário voltou a ficar livre');
+  assert.equal((await adm(`/api/admin/appointments/${ap.id}/cancel`, { method: 'POST', body: {} })).status, 409, 'já cancelado');
+  assert.equal((await pg('total')).status, 409, 'cancelado não recebe pagamento');
+  // excluir o agendamento apaga também os dados de pagamento
+  assert.equal((await adm(`/api/admin/appointments/${ap.id}`, { method: 'DELETE' })).status, 200);
+});
+
+test('finanças API: concluir e marcar não comparecimento (atendimentos passados) e reabrir', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agenda-fin-')), port = PORT + 888;
+  const ontem = iso(addDays(-1));
+  const doc = { version: 4, seq: 20, users: [{ id: 1, name: 'Ana Silva', phone: '5511988880001', hash: 'x' }],
+    services: [{ id: 'manicure', nome: 'Manicure', minutos: 60, preco: 40, icone: '💅', ativo: true }], slots: [],
+    appointments: [1, 2, 3].map((n) => ({ id: 10 + n, userId: 1, clienteNome: 'Ana Silva', clienteTel: '5511988880001', servicoId: 'manicure', servicoNome: 'Manicure', minutos: 60, preco: 40, date: ontem, time: `0${n}:00`, notes: '', status: 'aprovado', criadoEm: new Date().toISOString() })),
+    settings: { studio: null, logo: null, logoV: 0 } };
+  fs.mkdirSync(path.join(dir, 'uploads'), { recursive: true }); fs.writeFileSync(path.join(dir, 'db.json'), JSON.stringify(doc));
+  const p = await startServer({}, dir, port);
+  try {
+    let ck = '';
+    const call = async (url, body, method = body ? 'POST' : 'GET') => {
+      const r = await fetch(`http://127.0.0.1:${port}${url}`, { method, headers: { 'Content-Type': 'application/json', ...(ck ? { Cookie: ck } : {}) }, body: body ? JSON.stringify(body) : undefined });
+      const sc = r.headers.getSetCookie?.() || []; if (sc.length) ck = sc[0].split(';')[0];
+      return { status: r.status, json: await r.json().catch(() => null) };
+    };
+    assert.equal((await call('/api/admin/login', ADMIN)).status, 200);
+    const out = (id, resultado) => call(`/api/admin/appointments/${id}/outcome`, { resultado });
+    let r = await out(11, 'concluido'); assert.equal(r.status, 200); assert.equal(r.json.estado, 'concluido');
+    r = await out(12, 'nao_compareceu'); assert.equal(r.json.estado, 'nao_compareceu');
+    assert.equal((await call('/api/admin/appointments/11/cancel', {})).status, 409, 'concluído não pode ser cancelado sem reabrir');
+    // concluído com pagamento em aberto -> aparece como pendente de pagamento e no a receber
+    await call('/api/admin/appointments/11/payment', { tipo: 'sinal', forma: 'pix' });
+    const pend = (await call('/api/admin/appointments?pagamento=pendente')).json; assert.deepEqual(pend.map((x) => x.id), [11, 13], 'concluído com sinal + confirmado sem pagamento');
+    let d = (await call('/api/admin/dashboard?periodo=30')).json;
+    assert.deepEqual([d.kpis.concluidos, d.kpis.naoCompareceu, d.kpis.aReceber, d.kpis.receita, d.kpis.comparecimento], [1, 1, 20, 20, 50]);
+    await call('/api/admin/appointments/11/payment', { tipo: 'total', forma: 'cartao' });
+    d = (await call('/api/admin/dashboard?periodo=30')).json; assert.deepEqual([d.kpis.aReceber, d.kpis.receita], [0, 40]);
+    r = await out(11, null); assert.equal(r.json.estado, 'aprovado', 'reabrir volta a confirmado');
+    // o desfecho resiste a reiniciar o servidor (fica gravado)
+    p.kill(); await sleep(300);
+    const p2 = await startServer({}, dir, port);
+    try { ck = ''; await call('/api/admin/login', ADMIN); const l = (await call('/api/admin/appointments?estado=nao_compareceu')).json; assert.equal(l.length, 1); assert.equal((await call('/api/admin/appointments/11/payment', { tipo: 'nenhum' })).json.pago, 0); } finally { p2.kill(); }
+  } finally { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
