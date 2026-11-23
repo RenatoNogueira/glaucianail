@@ -781,3 +781,36 @@ html:not(.brand-ready) [data-brand-logo],html:not(.brand-ready) [data-brand-name
   .ag-seg button{flex-direction:column;gap:3px;padding:8px 4px;font-size:.74rem;white-space:normal;text-align:center}
   .ag-seg .ic{font-size:1.2rem}
 }
+
+/* ---------- Marca em destaque na página inicial (logo + nome grandes, pensados para celular e tablet) ---------- */
+.lp-brand{display:flex;align-items:center;gap:clamp(14px,3vw,24px);margin-bottom:clamp(14px,3vw,22px)}
+.lp-logo-wrap{position:relative;flex:0 0 auto;display:grid;place-items:center;width:clamp(96px,26vw,148px);height:clamp(96px,26vw,148px);border-radius:32%;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--card) 70%,transparent),color-mix(in srgb,var(--blush) 55%,transparent));
+  -webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);
+  box-shadow:0 14px 40px rgba(194,69,111,.30),inset 0 1px 0 rgba(255,255,255,.45)}
+.lp-logo-wrap::before{content:"";position:absolute;inset:-9px;border-radius:inherit;border:1.5px solid color-mix(in srgb,var(--rose) 45%,transparent);opacity:.7;animation:lpRing 3.6s ease-in-out infinite}
+@keyframes lpRing{0%,100%{transform:scale(.97);opacity:.35}50%{transform:scale(1.04);opacity:.85}}
+.lp-logo{display:grid;place-items:center;width:100%;height:100%;font-style:normal;font-size:clamp(2.6rem,10vw,4rem);overflow:hidden;border-radius:inherit}
+.lp-logo.has-logo{padding:12%}
+.lp-logo img{width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))}
+.lp-brandtxt{display:flex;flex-direction:column;gap:10px;min-width:0}
+.lp-name{font-family:'Playfair Display',serif;font-weight:600;line-height:1.08;letter-spacing:.01em;font-size:clamp(1.9rem,7.4vw,3rem);overflow-wrap:anywhere;
+  background:linear-gradient(100deg,var(--ink) 30%,var(--rose) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+.lp-rule{display:block;width:clamp(56px,16vw,96px);height:3px;border-radius:99px;background:linear-gradient(90deg,var(--rose),var(--gold))}
+/* celular e tablet em pé: marca centralizada, logo acima do nome */
+@media (max-width:859px){
+  .lp-brand{flex-direction:column;text-align:center;gap:16px;margin-bottom:20px}
+  .lp-brandtxt{align-items:center}
+  .lp-logo-wrap{width:clamp(120px,36vw,170px);height:clamp(120px,36vw,170px)}
+  .lp-name{font-size:clamp(2rem,8.6vw,3rem)}
+  .lp-copy .lp-badge{align-self:center}
+  .lp-copy{display:flex;flex-direction:column}
+}
+/* a marca fica no topo da página: a barra de cima mostra só o botão de tema na página inicial */
+body:has(.landing:not(.hidden)) .topbar .brand{visibility:hidden}
+@media (max-width:859px){body:has(.landing:not(.hidden)) .topbar>div{padding-top:6px;padding-bottom:6px}}
+@media (prefers-reduced-motion:reduce){.lp-logo-wrap::before{animation:none}}
+body:has(.landing:not(.hidden)) .topbar .brand{display:none}
+body:has(.landing:not(.hidden)) .topbar>div{display:flex;justify-content:flex-end;padding-top:8px;padding-bottom:8px}
+body:has(.landing:not(.hidden)) .topbar>div::before{display:none}
+body:has(.landing:not(.hidden)) .topbar .end{justify-self:auto}
