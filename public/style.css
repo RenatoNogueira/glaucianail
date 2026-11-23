@@ -819,3 +819,21 @@ body:has(.landing:not(.hidden)) .topbar .end{justify-self:auto}
 .topbar>div{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding-top:8px;padding-bottom:8px}
 .topbar>div::before{display:none}
 .topbar .end{justify-self:auto}
+
+/* Logo do modo claro x logo do modo escuro: as duas ficam no HTML e o tema decide qual aparece */
+[data-brand-logo] img.logo-dark{display:none !important}
+:root[data-theme="dark"] [data-brand-logo] img.logo-light{display:none !important}
+:root[data-theme="dark"] [data-brand-logo] img.logo-dark{display:block !important}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) [data-brand-logo] img.logo-light{display:none !important}
+  :root:not([data-theme="light"]) [data-brand-logo] img.logo-dark{display:block !important}
+}
+/* prévias no painel: fundo claro e fundo escuro para enxergar como a logo fica em cada modo */
+.logo-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:12px 0 4px}
+.logo-slot{border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center}
+.logo-slot h3{font-size:.95rem;margin:0}
+.logo-slot .logo-prev{width:132px;height:132px}
+.logo-slot.light .logo-prev{background:#fbf6f4;border-color:#e6d6d0;color:#7d6b76}
+.logo-slot.dark .logo-prev{background:#17101a;border-color:#3a2c3b;color:#b3a2ad}
+.logo-slot .row{justify-content:center;gap:8px}
+@media (max-width:560px){.logo-slots{grid-template-columns:1fr}}

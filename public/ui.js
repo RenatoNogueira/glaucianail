@@ -81,16 +81,27 @@ const skeleton = (n = 3) => '<div class="skel"></div>'.repeat(n);
 
 // ---------- Identidade (logo e nome da empresa) ----------
 // Elementos marcados com data-brand-logo / data-brand-name são preenchidos a partir de { studio, logo }
+// Duas logos opcionais: c.logo (padrão / modo escuro) e c.logoClaro (modo claro). Com só uma, ela vale para os dois modos.
+// Com duas, as duas imagens ficam no HTML e o CSS mostra a certa conforme o tema (sem piscar ao trocar).
+function brandLogoHtml(c) {
+  const escuro = c.logo || c.logoClaro, claro = c.logoClaro || c.logo;
+  if (!escuro) return '';
+  const alt = 'Logo ' + esc(c.studio);
+  return escuro === claro
+    ? `<img src="${esc(escuro)}" alt="${alt}">`
+    : `<img class="logo-light" src="${esc(claro)}" alt="${alt}"><img class="logo-dark" src="${esc(escuro)}" alt="${alt}">`;
+}
 function applyBrand(c) {
+  const any = c.logo || c.logoClaro;
   document.querySelectorAll('[data-brand-name]').forEach((e) => (e.textContent = c.studio));
   document.querySelectorAll('[data-brand-logo]').forEach((e) => {
-    e.innerHTML = c.logo ? `<img src="${esc(c.logo)}" alt="Logo ${esc(c.studio)}">` : esc(e.dataset.fallback || '💅');
-    e.classList.toggle('has-logo', !!c.logo);
+    e.innerHTML = any ? brandLogoHtml(c) : esc(e.dataset.fallback || '💅');
+    e.classList.toggle('has-logo', !!any);
   });
-  try { localStorage.setItem('brand', JSON.stringify({ studio: c.studio, logo: c.logo || null })); } catch {} // próxima abertura já nasce com a logo certa
+  try { localStorage.setItem('brand', JSON.stringify({ studio: c.studio, logo: c.logo || null, logoClaro: c.logoClaro || null })); } catch {} // próxima abertura já nasce com a logo certa
   document.documentElement.classList.add('brand-ready');
   let ic = document.querySelector('link[rel=icon]');
-  if (c.logo) { if (!ic) { ic = document.createElement('link'); ic.rel = 'icon'; document.head.append(ic); } ic.href = c.logo; } else if (ic) ic.href = '/icon-192.png'; // sem logo: volta ao ícone padrão
+  if (any) { if (!ic) { ic = document.createElement('link'); ic.rel = 'icon'; document.head.append(ic); } ic.href = c.logo || c.logoClaro; } else if (ic) ic.href = '/icon-192.png'; // sem logo: volta ao ícone padrão
 }
 
 // Ao recarregar (F5), usa a última marca conhecida na hora, em vez de piscar o ícone e o nome padrão até a resposta do servidor chegar.

@@ -184,8 +184,11 @@ function decide(id, s, a) {
 async function loadCfg() {
   const s = await api('/api/admin/settings');
   $('cfgName').value = s.studio;
-  $('cfgLogo').innerHTML = s.logo ? `<img src="${esc(s.logo)}" alt="Logo atual">` : '<span>💅</span><small>Sem logo</small>';
-  $('logoDel').hidden = !s.logo;
+  const prev = (url, alt) => (url ? `<img src="${esc(url)}" alt="${alt}">` : '<span>💅</span><small>Sem logo</small>');
+  $('cfgLogoClaro').innerHTML = s.logoClaro ? prev(s.logoClaro, 'Logo do modo claro') : (s.logo ? `<img src="${esc(s.logo)}" alt="Logo padrão" style="opacity:.55"><small style="position:absolute;bottom:4px">usa a do escuro</small>` : prev(null));
+  $('cfgLogo').innerHTML = prev(s.logo, 'Logo do modo escuro');
+  $('cfgLogoClaro').style.position = 'relative';
+  $('logoDelClaro').hidden = !s.logoClaro; $('logoDel').hidden = !s.logo;
 }
 function brandUpdated(r) { applyBrand(r); document.title = 'Admin – ' + r.studio; loadCfg(); }
 
@@ -199,19 +202,28 @@ async function prepareLogo(file) {
   if (url.length > 1.9e6) url = c.toDataURL('image/webp', 0.9);
   return url;
 }
-$('logoPick').onclick = () => $('logoFile').click();
+let logoTema = 'escuro';
+const TEMA_NOME = { claro: 'do modo claro', escuro: 'do modo escuro' };
+document.querySelector('.logo-slots').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-logo]'); if (!b) return;
+  logoTema = b.dataset.logo;
+  if (b.dataset.act === 'pick') return $('logoFile').click();
+  modal({
+    title: `Remover a logo ${TEMA_NOME[logoTema]}?`, html: logoTema === 'claro' ? '<p class="small">O modo claro passa a usar a logo do modo escuro.</p>' : '<p class="small">Sem logo padrão, o sistema usa a logo do modo claro (se houver) ou o ícone padrão.</p>',
+    actions: [{ label: 'Voltar', cls: 'sec' }, { label: 'Remover', cls: 'bad', onClick: async (close) => {
+      try { brandUpdated(await api('/api/admin/settings/logo?tema=' + logoTema, 'DELETE')); toast(`Logo ${TEMA_NOME[logoTema]} removida`, 'ok'); } catch (err) { toast(err.message, 'err'); }
+      close();
+    } }],
+  });
+});
 $('logoFile').onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
   try {
-    brandUpdated(await api('/api/admin/settings/logo', 'POST', { dataUrl: await prepareLogo(f) }));
-    toast('Logo atualizada ✓', 'ok');
+    brandUpdated(await api('/api/admin/settings/logo', 'POST', { dataUrl: await prepareLogo(f), tema: logoTema }));
+    toast(`Logo ${TEMA_NOME[logoTema]} atualizada ✓`, 'ok');
   } catch (err) { toast(err.message || 'Não foi possível usar esta imagem.', 'err'); }
 };
-$('logoDel').onclick = () => modal({
-  title: 'Remover a logo?', html: '<p class="small">O sistema volta a usar o ícone padrão.</p>',
-  actions: [{ label: 'Voltar', cls: 'sec' }, { label: 'Remover', cls: 'bad', onClick: async (close) => { try { brandUpdated(await api('/api/admin/settings/logo', 'DELETE')); toast('Logo removida', 'ok'); } catch (err) { toast(err.message, 'err'); } close(); } }],
-});
 $('cfgSave').onclick = async () => {
   try { brandUpdated(await api('/api/admin/settings', 'PUT', { studio: $('cfgName').value })); toast('Nome salvo ✓', 'ok'); }
   catch (err) { toast(err.message, 'err'); }

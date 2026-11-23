@@ -53,7 +53,8 @@ const nextId = () => ++db.seq;
 if (PROD && store.kind === 'arquivo') console.warn('⚠ Produção sem banco configurado (DATABASE_URL ou SUPABASE_URL + SUPABASE_SECRET_KEY): os dados ficarão em arquivo e podem ser perdidos (ex.: na Vercel).');
 
 const getStudio = () => db.settings.studio || STUDIO;
-const logoUrl = () => (db.settings.logo && store.logo.exists() ? `/logo?v=${db.settings.logoV}` : null);
+const TEMAS = ['claro', 'escuro']; // 'escuro' = logo padrão (também usada quando não há uma do modo claro)
+const logoUrl = (v = 'escuro') => (db.settings[v === 'claro' ? 'logoClaro' : 'logo'] && store.logo.exists(v) ? `/logo?${v === 'claro' ? 'tema=claro&' : ''}v=${db.settings.logoV}` : null);
 function sniffImage(buf) { // confere o conteúdo real do arquivo, não só o que o navegador declarou
   if (buf.length > 12 && buf.slice(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))) return 'png';
   if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
@@ -135,7 +136,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/logo', wrap(async (req, res) => {
   await store.init();
-  const l = await store.logo.get();
+  const l = await store.logo.get(req.query.tema === 'claro' ? 'claro' : 'escuro');
   if (!l) return res.status(404).end();
   res.set({ 'Content-Type': l.mime, 'Cache-Control': 'public, max-age=31536000, immutable' }).end(l.buffer);
 }));
@@ -188,7 +189,7 @@ app.use('/api', sessions.middleware, store.middleware);
 const needClient = (req, res, next) => (req.session.userId && db.users.some((u) => u.id === req.session.userId) ? next() : res.status(401).json({ erro: 'Faça login.' }));
 const needAdmin = (req, res, next) => (req.session.admin ? next() : res.status(401).json({ erro: 'Acesso restrito.' }));
 
-app.get('/api/config', (req, res) => res.json({ studio: getStudio(), logo: logoUrl(), textos: landing.mesclar(db.settings.landing), servicos: db.services.filter((s) => s.ativo) }));
+app.get('/api/config', (req, res) => res.json({ studio: getStudio(), logo: logoUrl(), logoClaro: logoUrl('claro'), textos: landing.mesclar(db.settings.landing), servicos: db.services.filter((s) => s.ativo) }));
 
 // ----- Cliente -----
 app.post('/api/register', wrap(async (req, res) => {
@@ -564,13 +565,13 @@ app.delete('/api/admin/clients/:id', needAdmin, wrap(async (req, res) => {
 }));
 
 // ----- Configurações: nome e logo -----
-app.get('/api/admin/settings', needAdmin, (req, res) => res.json({ studio: getStudio(), studioCustom: db.settings.studio || '', logo: logoUrl() }));
+app.get('/api/admin/settings', needAdmin, (req, res) => res.json({ studio: getStudio(), studioCustom: db.settings.studio || '', logo: logoUrl(), logoClaro: logoUrl('claro') }));
 app.put('/api/admin/settings', needAdmin, wrap(async (req, res) => {
   const nome = String((req.body || {}).studio || '').trim();
   if (nome && (nome.length < 2 || nome.length > 60)) return res.status(400).json({ erro: 'O nome deve ter de 2 a 60 caracteres.' });
   db.settings.studio = nome || null; // vazio = volta ao nome padrão
   await save();
-  res.json({ studio: getStudio(), logo: logoUrl() });
+  res.json({ studio: getStudio(), logo: logoUrl(), logoClaro: logoUrl('claro') });
 }));
 app.post('/api/admin/settings/logo', needAdmin, wrap(async (req, res) => {
   const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String((req.body || {}).dataUrl || ''));
@@ -579,15 +580,19 @@ app.post('/api/admin/settings/logo', needAdmin, wrap(async (req, res) => {
   if (buf.length > 1.5 * 1024 * 1024) return res.status(413).json({ erro: 'Imagem muito grande (máx. 1,5 MB).' });
   const ext = sniffImage(buf);
   if (!ext) return res.status(400).json({ erro: 'O arquivo não é uma imagem válida.' });
-  await store.logo.put(buf, ext);
-  db.settings.logo = ext; db.settings.logoV = Date.now();
+  const tema = (req.body || {}).tema === undefined ? 'escuro' : (req.body || {}).tema;
+  if (!TEMAS.includes(tema)) return res.status(400).json({ erro: 'Escolha a logo do modo claro ou do modo escuro.' });
+  await store.logo.put(buf, ext, tema);
+  db.settings[tema === 'claro' ? 'logoClaro' : 'logo'] = ext; db.settings.logoV = Date.now();
   await save();
-  res.json({ studio: getStudio(), logo: logoUrl() });
+  res.json({ studio: getStudio(), logo: logoUrl(), logoClaro: logoUrl('claro') });
 }));
 app.delete('/api/admin/settings/logo', needAdmin, wrap(async (req, res) => {
-  await store.logo.del(); db.settings.logo = null;
+  const tema = req.query.tema === undefined ? 'escuro' : req.query.tema;
+  if (!TEMAS.includes(tema)) return res.status(400).json({ erro: 'Escolha a logo do modo claro ou do modo escuro.' });
+  await store.logo.del(tema); db.settings[tema === 'claro' ? 'logoClaro' : 'logo'] = null; db.settings.logoV = Date.now();
   await save();
-  res.json({ studio: getStudio(), logo: null });
+  res.json({ studio: getStudio(), logo: logoUrl(), logoClaro: logoUrl('claro') });
 }));
 
 // ----- Textos da página inicial (editáveis pela admin) -----

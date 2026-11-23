@@ -79,3 +79,26 @@ test('backup do admin devolve o banco completo', async () => {
   const r = await admin('/api/admin/backup');
   assert.equal(r.status, 200); assert.ok(r.json.users.length > 0); assert.equal(r.json.version, app.store.SCHEMA_VERSION);
 });
+
+test('duas logos: uma para o modo claro e outra para o escuro', async () => {
+  const mk = (n) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, n)]);
+  const up = (png, tema) => admin('/api/admin/settings/logo', { method: 'POST', body: { dataUrl: 'data:image/png;base64,' + png.toString('base64'), ...(tema ? { tema } : {}) } });
+  const get = async (q = '') => { const r = await fetch(BASE + '/logo' + q); return { status: r.status, buf: Buffer.from(await r.arrayBuffer()) }; };
+  assert.equal((await up(mk(1), 'verde')).status, 400, 'tema inválido');
+  assert.equal((await up(mk(1))).status, 200, 'sem tema = logo padrão (escuro)');
+  let cfg = (await client()('/api/config')).json; assert.ok(cfg.logo); assert.equal(cfg.logoClaro, null, 'só uma logo: a outra fica vazia');
+  const r = await up(mk(2), 'claro'); assert.equal(r.status, 200); assert.ok(r.json.logoClaro && r.json.logo);
+  cfg = (await client()('/api/config')).json; assert.ok(cfg.logo && cfg.logoClaro && cfg.logo !== cfg.logoClaro);
+  assert.ok((await get()).buf.equals(mk(1)), 'padrão continua a primeira'); assert.ok((await get('?tema=claro')).buf.equals(mk(2)), 'modo claro serve a segunda');
+  assert.equal((await admin('/api/admin/settings/logo?tema=verde', { method: 'DELETE' })).status, 400);
+  // trocar só a logo do claro não mexe na outra
+  await up(mk(3), 'claro'); assert.ok((await get()).buf.equals(mk(1))); assert.ok((await get('?tema=claro')).buf.equals(mk(3)));
+  // remover a padrão mantém a do claro; remover a do claro mantém a padrão
+  assert.equal((await admin('/api/admin/settings/logo', { method: 'DELETE' })).status, 200);
+  assert.equal((await get()).status, 404); assert.ok((await get('?tema=claro')).buf.equals(mk(3)));
+  await up(mk(4)); assert.equal((await admin('/api/admin/settings/logo?tema=claro', { method: 'DELETE' })).status, 200);
+  assert.equal((await get('?tema=claro')).status, 404); assert.ok((await get()).buf.equals(mk(4)));
+  assert.equal((await client()('/api/config')).json.logoClaro, null);
+  assert.equal((await admin('/api/admin/settings/logo', { method: 'DELETE' })).status, 200);
+  assert.equal((await get()).status, 404);
+});

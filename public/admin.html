@@ -182,14 +182,20 @@
         <div class="card">
           <h2>Identidade do estúdio</h2>
           <p class="small">Nome e logo aparecem para as clientes, nas mensagens de WhatsApp e neste painel.</p>
-          <div class="id-row">
-            <div class="logo-prev" id="cfgLogo"></div>
-            <div class="id-actions">
-              <div class="row" style="gap:8px"><button type="button" class="btn sm" id="logoPick">📷 Enviar logo</button><button type="button" class="btn bad sm" id="logoDel">Remover</button></div>
-              <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" hidden>
-              <p class="small" style="margin:8px 0 0">PNG, JPG ou WEBP. Ajustamos o tamanho automaticamente; fundo transparente (PNG) fica melhor.</p>
+          <div class="logo-slots">
+            <div class="logo-slot light">
+              <h3>☀️ Modo claro</h3>
+              <div class="logo-prev" id="cfgLogoClaro"></div>
+              <div class="row"><button type="button" class="btn sm" data-logo="claro" data-act="pick">📷 Enviar</button><button type="button" class="btn bad sm" data-logo="claro" data-act="del" id="logoDelClaro">Remover</button></div>
+            </div>
+            <div class="logo-slot dark">
+              <h3>🌙 Modo escuro</h3>
+              <div class="logo-prev" id="cfgLogo"></div>
+              <div class="row"><button type="button" class="btn sm" data-logo="escuro" data-act="pick">📷 Enviar</button><button type="button" class="btn bad sm" data-logo="escuro" data-act="del" id="logoDel">Remover</button></div>
             </div>
           </div>
+          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" hidden>
+          <p class="small" style="margin:8px 0 14px">Envie uma logo para cada modo: por exemplo, uma <strong>escura</strong> para o modo claro e uma <strong>clara</strong> para o modo escuro. Se enviar só uma, ela vale para os dois. PNG com fundo transparente fica melhor; ajustamos o tamanho automaticamente.</p>
           <label for="cfgName">Nome da empresa</label>
           <div class="row" style="flex-wrap:nowrap"><input id="cfgName" maxlength="60" placeholder="Ex.: Studio Bella Unhas"><button type="button" class="btn" id="cfgSave" style="flex:0 0 auto;min-width:0">Salvar</button></div>
           <p class="small" style="margin:8px 0 0">Deixe em branco para usar o nome padrão do sistema.</p>
