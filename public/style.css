@@ -814,3 +814,8 @@ body:has(.landing:not(.hidden)) .topbar .brand{display:none}
 body:has(.landing:not(.hidden)) .topbar>div{display:flex;justify-content:flex-end;padding-top:8px;padding-bottom:8px}
 body:has(.landing:not(.hidden)) .topbar>div::before{display:none}
 body:has(.landing:not(.hidden)) .topbar .end{justify-self:auto}
+
+/* Barra superior: só o botão de tema (e "Sair" quando a cliente está logada); a marca fica no topo da página inicial */
+.topbar>div{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding-top:8px;padding-bottom:8px}
+.topbar>div::before{display:none}
+.topbar .end{justify-self:auto}
