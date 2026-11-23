@@ -841,3 +841,10 @@ body:has(.landing:not(.hidden)) .topbar .end{justify-self:auto}
 /* Nome com degradê no texto: folga em cima/embaixo para não cortar as caudas das letras (g, y, j) */
 .lp-name{line-height:1.2;padding:.06em 0 .16em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .lp-brandtxt{gap:6px}
+
+/* Zoom suave na logo ao passar o mouse (e ao tocar, no celular) */
+.lp-logo-wrap{cursor:pointer;transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s}
+.lp-logo img,.lp-logo{transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.lp-logo-wrap:hover,.lp-logo-wrap:active{transform:scale(1.12);box-shadow:0 20px 54px rgba(194,69,111,.45),inset 0 1px 0 rgba(255,255,255,.5)}
+.lp-logo-wrap:hover .lp-logo img,.lp-logo-wrap:active .lp-logo img{transform:scale(1.06)}
+@media (prefers-reduced-motion:reduce){.lp-logo-wrap,.lp-logo img{transition:none}.lp-logo-wrap:hover,.lp-logo-wrap:active,.lp-logo-wrap:hover .lp-logo img{transform:none}}
