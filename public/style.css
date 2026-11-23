@@ -837,3 +837,7 @@ body:has(.landing:not(.hidden)) .topbar .end{justify-self:auto}
 .logo-slot.dark .logo-prev{background:#17101a;border-color:#3a2c3b;color:#b3a2ad}
 .logo-slot .row{justify-content:center;gap:8px}
 @media (max-width:560px){.logo-slots{grid-template-columns:1fr}}
+
+/* Nome com degradê no texto: folga em cima/embaixo para não cortar as caudas das letras (g, y, j) */
+.lp-name{line-height:1.2;padding:.06em 0 .16em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.lp-brandtxt{gap:6px}
