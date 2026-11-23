@@ -57,12 +57,12 @@ const afterChange = () => loaders[cur]();
 
 // ---------- Paginação ----------
 // pager(elemento, estado{p}, total, tamanho, redesenhar): mostra "1–10 de 37" e os botões de página; clampa a página atual.
-const PAGES = { home: { p: 1 }, req: { p: 1 }, cli: { p: 1 } };
+const PAGES = { home: { p: 1 }, req: { p: 1 }, cli: { p: 1 }, ag: { p: 1 } };
 function paginar(items, st, size) { // devolve só os itens da página atual (e corrige a página se a lista encolheu)
   const n = Math.max(1, Math.ceil(items.length / size)); if (st.p > n) st.p = n; if (st.p < 1) st.p = 1;
   return items.slice((st.p - 1) * size, st.p * size);
 }
-function pager(el, st, total, size, redraw) {
+function pager(el, st, total, size, redraw, unit = '') {
   const n = Math.ceil(total / size);
   if (n <= 1) { el.innerHTML = ''; el.onclick = null; return; }
   const set = new Set([1, n, st.p - 1, st.p, st.p + 1]); if (st.p <= 2) { set.add(2); set.add(3); } if (st.p >= n - 1) { set.add(n - 1); set.add(n - 2); }
@@ -70,7 +70,7 @@ function pager(el, st, total, size, redraw) {
   let last = 0, btns = '';
   for (const x of nums) { if (x - last > 1) btns += '<span class="pg-gap">…</span>'; btns += `<button type="button" class="pg ${x === st.p ? 'on' : ''}" data-p="${x}" ${x === st.p ? 'aria-current="page"' : ''} aria-label="Página ${x}">${x}</button>`; last = x; }
   const a = (st.p - 1) * size + 1, b = Math.min(total, st.p * size);
-  el.innerHTML = `<span class="small pg-info">${a}–${b} de ${total}</span><nav class="pg-nav" aria-label="Paginação">
+  el.innerHTML = `<span class="small pg-info">${a}–${b} de ${total}${unit ? ' ' + unit : ''}</span><nav class="pg-nav" aria-label="Paginação">
     <button type="button" class="pg" data-p="${st.p - 1}" ${st.p === 1 ? 'disabled' : ''} aria-label="Página anterior">‹</button>${btns}
     <button type="button" class="pg" data-p="${st.p + 1}" ${st.p === n ? 'disabled' : ''} aria-label="Próxima página">›</button></nav>`;
   el.onclick = (e) => { const x = e.target.closest('[data-p]'); if (!x || x.disabled) return; st.p = +x.dataset.p; redraw(); };
@@ -418,6 +418,7 @@ function agTab(t) {
 $('agTabs').querySelectorAll('button').forEach((b) => (b.onclick = () => agTab(b.dataset.t)));
 
 // ----- Gerenciar agenda: filtros, seleção e exclusão em massa -----
+const AG_SIZE = 7; // dias por página na lista de horários
 const ag = { all: [], period: '30', wd: new Set([0, 1, 2, 3, 4, 5, 6]), sel: new Set() };
 const PERIODS = [['7', 'Próximos 7 dias'], ['30', 'Próximos 30 dias'], ['all', 'Tudo']];
 const WD_SHORT = [[1, 'Seg'], [2, 'Ter'], [3, 'Qua'], [4, 'Qui'], [5, 'Sex'], [6, 'Sáb'], [0, 'Dom']];
@@ -461,10 +462,13 @@ function renderManage() {
       ? '<div class="empty"><span class="big">🔎</span>Nenhum horário com esses filtros.<br>Mude o período ou os dias da semana.</div>'
       : '<div class="empty"><span class="big">🗓️</span>Nenhum horário publicado ainda.<br><br><button type="button" class="btn" id="goPub">➕ Publicar horários</button></div>';
     if ($('goPub')) $('goPub').onclick = () => agTab('publish');
+    $('agPg').innerHTML = '';
   } else {
     const byDay = {};
     vis.forEach((x) => (byDay[x.date] = byDay[x.date] || []).push(x));
-    $('slotList').innerHTML = Object.entries(byDay).map(([d, xs]) => {
+    const diasAll = Object.entries(byDay), diasPg = paginar(diasAll, PAGES.ag, AG_SIZE);
+    pager($('agPg'), PAGES.ag, diasAll.length, AG_SIZE, () => { renderManage(); $('slotList').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 'dias');
+    $('slotList').innerHTML = diasPg.map(([d, xs]) => {
       const dt = new Date(d + 'T12:00:00'), fr = xs.filter((x) => !x.ocupado), nSel = fr.filter((x) => ag.sel.has(x.id)).length;
       return `<div class="ag-day">
         <div class="ag-dayh">
@@ -570,10 +574,10 @@ function renderBar() {
 }
 
 // Interações (delegadas)
-$('agPeriod').onclick = (e) => { const b = e.target.closest('[data-p]'); if (b) { ag.period = b.dataset.p; renderManage(); } };
+$('agPeriod').onclick = (e) => { const b = e.target.closest('[data-p]'); if (b) { ag.period = b.dataset.p; PAGES.ag.p = 1; renderManage(); } };
 $('agWd').onclick = (e) => {
   const b = e.target.closest('[data-n]'); if (!b) return;
-  const n = +b.dataset.n; ag.wd.has(n) ? ag.wd.delete(n) : ag.wd.add(n); renderManage();
+  const n = +b.dataset.n; ag.wd.has(n) ? ag.wd.delete(n) : ag.wd.add(n); PAGES.ag.p = 1; renderManage();
 };
 $('agTimes').onclick = (e) => {
   const b = e.target.closest('[data-t]'); if (!b) return;
