@@ -771,3 +771,13 @@ html:not(.brand-ready) [data-brand-logo],html:not(.brand-ready) [data-brand-name
 #tabs{flex-wrap:wrap;overflow:visible;gap:5px}
 #tabs button{padding:6px 12px;font-size:.82rem;border:1px solid var(--line)}
 #tabs button.on{border-color:var(--ink)}
+
+/* Menu da Agenda (Gerenciar / Calendário mensal / Publicar): uma linha, 3 colunas iguais */
+.ag-seg{grid-template-columns:repeat(3,minmax(0,1fr));max-width:600px;width:100%;gap:4px;border-radius:16px;padding:4px}
+.ag-seg button{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 8px;border-radius:12px;font-size:.9rem;line-height:1.2;white-space:nowrap;transition:.15s}
+.ag-seg button:hover:not(.on){background:color-mix(in srgb,var(--card) 60%,transparent);color:var(--ink)}
+.ag-seg .ic{font-size:1.05rem;line-height:1}
+@media (max-width:620px){
+  .ag-seg button{flex-direction:column;gap:3px;padding:8px 4px;font-size:.74rem;white-space:normal;text-align:center}
+  .ag-seg .ic{font-size:1.2rem}
+}
